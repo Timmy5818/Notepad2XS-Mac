@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import "EditorWindowController.h"
 #import "Settings.h"
 #import "SyntaxStyles.h"
 #import "TextEncoding.h"
@@ -38,8 +39,22 @@ void N2ShowFileSearch(void);
 @end
 
 @implementation N2DocumentController
+// 啟動時自動建立、還沒動過的空白文件：開啟檔案後關掉它（與 TextEdit 相同），不會留下多餘的「未命名」分頁
+- (Document *)transientDocument {
+    NSArray *docs = self.documents;
+    if (docs.count != 1 || ![docs[0] isKindOfClass:Document.class]) return nil;
+    Document *d = docs[0];
+    if (d.fileURL || d.isDocumentEdited || d.editor.textAsUTF8.length) return nil;
+    return d;
+}
+
 - (void)openDocumentWithContentsOfURL:(NSURL *)url display:(BOOL)display
-                    completionHandler:(void (^)(NSDocument *, BOOL, NSError *))handler {
+                    completionHandler:(void (^)(NSDocument *, BOOL, NSError *))original {
+    Document *transient = [self transientDocument];
+    void (^handler)(NSDocument *, BOOL, NSError *) = ^(NSDocument *doc, BOOL already, NSError *e) {
+        if (doc && !already && transient && doc != transient && !transient.isDocumentEdited) [transient close];
+        original(doc, already, e);
+    };
     if (N2ArchiveKindForURL(url) == N2ArchiveNone) {
         [super openDocumentWithContentsOfURL:url display:display completionHandler:handler];
         return;
@@ -77,7 +92,11 @@ void N2ShowFileSearch(void);
     [N2Settings registerDefaults];
     N2ApplyLanguagePreference();   // 系統的開啟／儲存視窗使用相同語言（下次啟動生效）
     [self buildMainMenu];
+    N2InstallTabMiddleClick();
 }
+
+// 沒有任何文件視窗時按 ⌘T：開一份新文件
+- (IBAction)newWindowForTab:(id)sender { [NSDocumentController.sharedDocumentController newDocument:sender]; }
 
 - (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender { return YES; }
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app { return YES; }
@@ -128,6 +147,7 @@ void N2ShowFileSearch(void);
     // 檔案
     NSMenu *file = Submenu(main, @"檔案");
     Item(file, @"新增", @selector(newDocument:), @"n");
+    Item(file, @"新增分頁", @selector(newWindowForTab:), @"t");
     Item(file, @"開啟…", @selector(openDocument:), @"o");
     NSMenu *recent = Submenu(file, @"打開最近使用的檔案");
     Item(recent, @"清除選單", @selector(clearRecentDocuments:), nil);   // 系統會自動填入最近檔案
@@ -236,7 +256,7 @@ void N2ShowFileSearch(void);
 
     // 格式
     NSMenu *format = Submenu(main, @"格式");
-    Item(format, @"字型…", @selector(showEditorFont:), @"t");
+    Item(format, @"字型…", @selector(showEditorFont:), @"t", C | K);   // ⌘T 讓給「新增分頁」
     NSMenu *lang = Submenu(format, @"語法上色");
     Item(lang, @"自動（依副檔名）", @selector(selectLanguage:), nil, 0, -1);
     Sep(lang);
@@ -332,6 +352,22 @@ void N2ShowFileSearch(void);
     NSMenu *window = Submenu(main, @"視窗");
     Item(window, @"最小化", @selector(performMiniaturize:), @"m");
     Item(window, @"縮放", @selector(performZoom:), nil);
+    Sep(window);
+    // 分頁（動作由 NSWindow 處理；⌃Tab／⌃⇧Tab 系統內建也可以切換）
+    Item(window, @"上一個分頁", @selector(selectPreviousTab:), @"{");
+    Item(window, @"下一個分頁", @selector(selectNextTab:), @"}");
+    // ⌃Tab／⌃⇧Tab：系統慣用的分頁切換鍵，以隱藏項目提供（選單只顯示上面兩項）
+    unichar tabKey = NSTabCharacter, backTab = NSBackTabCharacter;
+    NSMenuItem *ctrlTab = Item(window, @"下一個分頁", @selector(selectNextTab:), [NSString stringWithCharacters:&tabKey length:1], K);
+    NSMenuItem *ctrlShiftTab = Item(window, @"上一個分頁", @selector(selectPreviousTab:), [NSString stringWithCharacters:&backTab length:1], K | S);
+    for (NSMenuItem *it in @[ctrlTab, ctrlShiftTab]) { it.hidden = YES; it.allowsKeyEquivalentWhenHidden = YES; }
+    NSMenu *tabNumbers = Submenu(window, @"切換到分頁");
+    for (int i = 1; i <= 9; i++)
+        Item(tabNumbers, i == 9 ? N2L(@"最後一個分頁") : [NSString stringWithFormat:N2L(@"第 %d 個分頁"), i],
+             @selector(selectTabByNumber:), [NSString stringWithFormat:@"%d", i], C, i);
+    Item(window, @"顯示所有分頁", @selector(toggleTabOverview:), @"\\", C | S);
+    Item(window, @"將分頁移至新視窗", @selector(moveTabToNewWindow:), nil);
+    Item(window, @"合併所有視窗", @selector(mergeAllWindows:), nil);
     Sep(window);
     Item(window, @"將此程式所有視窗移至最前", @selector(arrangeInFront:), nil);
     NSApp.windowsMenu = window;

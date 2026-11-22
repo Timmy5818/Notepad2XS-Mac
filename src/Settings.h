@@ -13,7 +13,8 @@ extern NSString *const N2KeyFontName, *const N2KeyFontSize, *const N2KeyWordWrap
     *const N2KeyShowWhitespace, *const N2KeyShowEOL, *const N2KeyWrapSymbols, *const N2KeyIndentGuides,
     *const N2KeyLongLineMarker, *const N2KeyLongLineColumn, *const N2KeyMatchBraces, *const N2KeyHighlightLine,
     *const N2KeyHighlightSelection, *const N2KeyInvertColors, *const N2KeyNewEncoding, *const N2KeyNewEOL,
-    *const N2KeyHistoryEnabled, *const N2KeyHistoryKeep, *const N2KeyHistoryFolder, *const N2KeyUILanguage;
+    *const N2KeyHistoryEnabled, *const N2KeyHistoryKeep, *const N2KeyHistoryFolder, *const N2KeyUILanguage,
+    *const N2KeyOpenInTabs, *const N2KeyAlwaysShowTabBar;
 
 @interface N2Settings : NSObject
 + (void)registerDefaults;
@@ -38,6 +39,8 @@ extern NSString *const N2KeyFontName, *const N2KeyFontSize, *const N2KeyWordWrap
 @property (class, nonatomic) BOOL invertColors;
 @property (class, nonatomic) N2Encoding newDocumentEncoding;
 @property (class, nonatomic) int newDocumentEOL;   // SC_EOL_*
+@property (class, nonatomic, readonly) BOOL alwaysShowTabBar;   // 只有一個分頁時也顯示分頁列
+@property (class, nonatomic, readonly) BOOL openInTabs;         // 開啟／新增文件時加入目前視窗的分頁（預設），否則開新視窗
 @property (class, nonatomic, readonly) BOOL historyEnabled;     // 本機版本歷史（預設關閉）
 @property (class, nonatomic, readonly) NSInteger historyKeep;   // 每個檔案保留版本數（1～1000，預設 30）
 @property (class, nonatomic, readonly) NSString *historyFolder;

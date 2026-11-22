@@ -127,6 +127,11 @@ static NSString *KP(NSString *key) { return [@"values." stringByAppendingString:
     NSButton *pick = [NSButton buttonWithTitle:@"選擇…" target:self action:@selector(chooseHistoryFolder:)];
     pick.frame = NSMakeRect(388, 69, 90, 32);
     [g addSubview:pick];
+    // 開啟文件的方式：分頁或新視窗（只影響之後開啟的文件）
+    [self label:@"開啟文件：" at:NSMakeRect(0, 30, 130, 20) in:g];
+    [self popup:@[@[N2L(@"在分頁中開啟"), @1], @[N2L(@"在新視窗中開啟"), @0]] key:N2KeyOpenInTabs
+             at:NSMakeRect(136, 25, 220, 26) in:g];
+    [self check:N2L(@"永遠顯示分頁列（只有一個分頁時也顯示）") key:N2KeyAlwaysShowTabBar at:2 in:g];
 
     // 編輯
     NSView *e = [self tabView:tabs title:@"編輯"];

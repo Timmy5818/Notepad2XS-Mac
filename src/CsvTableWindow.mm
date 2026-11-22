@@ -30,6 +30,11 @@ static NSMutableSet *gCsvWindows;
     if (!w) return;
     if (!gCsvWindows) gCsvWindows = [NSMutableSet set];
     [gCsvWindows addObject:w];
+    // 表格視窗不超過文件視窗的內容區（含分頁列時可用高度較小），避免底部按鈕被裁掉
+    NSSize avail = ed.window.contentLayoutRect.size;
+    NSSize want = w.window.frame.size;
+    [w.window setContentSize:NSMakeSize(MAX(MIN(want.width, avail.width - 20), w.window.minSize.width),
+                                        MAX(MIN(want.height, avail.height - 20), w.window.minSize.height))];
     [ed.window beginSheet:w.window completionHandler:nil];
 }
 

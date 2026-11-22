@@ -69,6 +69,13 @@ static const NSInteger N2ReplaceAllReadOnly = -2;   // replaceAll：文件唯讀
 - (void)runPendingAutoDecrypt;
 @end
 
+// 多分頁（實作在 EditorTabs.mm）
+@interface EditorWindowController (Tabs)
+- (void)setupTabbing;
+- (void)ensureTabBarShown;
+@end
+void N2InstallTabMiddleClick(void);   // 滑鼠中鍵點分頁即關閉
+
 // 工具列（實作在 EditorToolbar.mm）
 @interface EditorWindowController (Toolbar) <NSToolbarDelegate>
 - (void)setupToolbar;

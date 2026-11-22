@@ -28,6 +28,8 @@ NSString *const N2KeyHistoryEnabled = @"HistoryEnabled";
 NSString *const N2KeyHistoryKeep = @"HistoryKeep";
 NSString *const N2KeyHistoryFolder = @"HistoryFolder";
 NSString *const N2KeyUILanguage = @"UILanguage";
+NSString *const N2KeyOpenInTabs = @"OpenInTabs";
+NSString *const N2KeyAlwaysShowTabBar = @"AlwaysShowTabBar";
 
 static NSUserDefaults *UD(void) { return NSUserDefaults.standardUserDefaults; }
 
@@ -82,6 +84,8 @@ static void SetB(NSString *k, BOOL v) { [UD() setBool:v forKey:k]; }
         N2KeyHistoryEnabled: @NO,
         N2KeyHistoryKeep: @30,
         N2KeyHistoryFolder: @"",
+        N2KeyOpenInTabs: @YES,
+        N2KeyAlwaysShowTabBar: @YES,   // 只有一個分頁時也顯示分頁列（含「＋」）   // 開啟文件：YES＝分頁、NO＝新視窗
         N2KeyUILanguage: @"zh-Hant",   // 與 Windows 版相同，預設繁體中文；空字串＝跟隨系統
     };
     [UD() registerDefaults:defaults];
@@ -185,6 +189,8 @@ static CGFloat ClampFontSize(CGFloat v) { return MIN(MAX(v, 4.0), 200.0); }
 + (void)setNewDocumentEOL:(int)v { [UD() setInteger:v forKey:N2KeyNewEOL]; }
 
 + (BOOL)historyEnabled { return B(N2KeyHistoryEnabled); }
++ (BOOL)openInTabs { return B(N2KeyOpenInTabs); }
++ (BOOL)alwaysShowTabBar { return B(N2KeyAlwaysShowTabBar); }
 + (NSInteger)historyKeep {
     NSInteger n = [UD() integerForKey:N2KeyHistoryKeep];
     return (n >= 1 && n <= 1000) ? n : 30;

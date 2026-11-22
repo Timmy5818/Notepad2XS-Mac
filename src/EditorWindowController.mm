@@ -78,12 +78,12 @@ static const CGFloat kStatusBarHeight = 22;
         backing:NSBackingStoreBuffered defer:YES];
     win.minSize = NSMakeSize(320, 200);
     win.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
-    win.tabbingMode = NSWindowTabbingModeDisallowed;
     if ((self = [super initWithWindow:win])) {
         win.delegate = self;
         self.shouldCascadeWindows = YES;
         [self buildViews];
         [self setupToolbar];
+        [self setupTabbing];
         [self applySettings];
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(settingsChanged:)
                                                    name:N2SettingsChangedNotification object:nil];
@@ -274,6 +274,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
     NSSet *keys = n.userInfo[N2SettingsChangedKeys];
     BOOL styles = !keys || [keys intersectsSet:[NSSet setWithObjects:N2KeyFontName, N2KeyFontSize, N2KeyInvertColors, nil]];
     [self applySettingsRestyle:styles];
+    if ([keys containsObject:N2KeyAlwaysShowTabBar]) [self ensureTabBarShown];
 }
 
 - (void)applySettings { [self applySettingsRestyle:YES]; }
@@ -883,6 +884,7 @@ static int SciFlags(N2FindOptions o) {
 #pragma mark - 視窗
 
 - (void)windowDidBecomeKey:(NSNotification *)n {
+    [self ensureTabBarShown];
     NSResponder *fr = self.window.firstResponder;
     BOOL inEditor = [fr isKindOfClass:NSView.class] &&
                     ([(NSView *)fr isDescendantOf:_primary] || (_secondary && [(NSView *)fr isDescendantOf:_secondary]));
