@@ -7,6 +7,38 @@
 - 支援 macOS 11 以上，Universal Binary（Intel x86_64 ＋ Apple 晶片 arm64）
 - 介面語言：繁體中文（預設）、English、日本語、简体中文、한국어、Français、Deutsch、Русский
 
+![主畫面](docs/screenshots/main.png)
+
+## 截圖
+
+### 編輯與尋找
+
+| 尋找與取代（醒目提示相同文字） | F5 執行選取（數學運算） |
+|---|---|
+| ![尋找與取代](docs/screenshots/find-replace.png) | ![F5 數學運算](docs/screenshots/f5-math.png) |
+
+### 加密
+
+| EXES 加密：文字密碼 | EXES 加密：金鑰檔案 |
+|---|---|
+| ![加密：文字密碼](docs/screenshots/encrypt-password.png) | ![加密：金鑰檔案](docs/screenshots/encrypt-keyfile.png) |
+
+加密後的文件會鎖定為唯讀，標題列顯示加密狀態：
+
+![加密後](docs/screenshots/encrypted.png)
+
+### 設定
+
+| 一般 | 編輯 | 檢視 |
+|---|---|---|
+| ![設定：一般](docs/screenshots/settings-general.png) | ![設定：編輯](docs/screenshots/settings-editor.png) | ![設定：檢視](docs/screenshots/settings-view.png) |
+
+### 其他工具
+
+| CSV 表格模式 | 人工智慧連接設定 |
+|---|---|
+| ![CSV 表格模式](docs/screenshots/csv-table.png) | ![人工智慧連接設定](docs/screenshots/ai-settings.png) |
+
 ## 下載與安裝
 
 到 [Releases](../../releases) 下載 `Notepad2XS.dmg`，把 App 拖進「應用程式」資料夾。
