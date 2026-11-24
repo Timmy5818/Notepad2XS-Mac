@@ -298,16 +298,18 @@ static void ApplyLexerStyles(ScintillaView *v, const LangInfo *lang, NSString *f
     } else if ([lid isEqualToString:@"swift"]) {
         StyleCpp(v); Keywords(v, 0, kSwiftKeywords);
     } else if ([lid isEqualToString:@"json"]) {
-        Fore(v, SCE_JSON_NUMBER, kNumber);
-        Fore(v, SCE_JSON_STRING, kString); Fore(v, SCE_JSON_STRINGEOL, kString);
-        Fore(v, SCE_JSON_PROPERTYNAME, kKeyword2);
-        Fore(v, SCE_JSON_KEYWORD, kKeyword); Bold(v, SCE_JSON_KEYWORD);
-        Fore(v, SCE_JSON_LINECOMMENT, kComment); Fore(v, SCE_JSON_BLOCKCOMMENT, kComment);
+        // 與 Windows 版 R151 的 JSON 配置相同的顏色
+        Fore(v, SCE_JSON_PROPERTYNAME, RGB(0x00, 0x3A, 0x8C)); Bold(v, SCE_JSON_PROPERTYNAME);
+        for (int s : {SCE_JSON_STRING, SCE_JSON_URI, SCE_JSON_COMPACTIRI}) Fore(v, s, RGB(0x00, 0x80, 0x00));
+        Fore(v, SCE_JSON_NUMBER, RGB(0xA0, 0x40, 0x00));
+        Fore(v, SCE_JSON_KEYWORD, RGB(0x80, 0x25, 0x80)); Bold(v, SCE_JSON_KEYWORD);
+        Fore(v, SCE_JSON_ESCAPESEQUENCE, RGB(0xB0, 0x2C, 0x56)); Bold(v, SCE_JSON_ESCAPESEQUENCE);
         Fore(v, SCE_JSON_OPERATOR, kOperator);
-        Fore(v, SCE_JSON_ESCAPESEQUENCE, kPreproc);
-        Fore(v, SCE_JSON_ERROR, RGB(0xFF, 0, 0));
-        Keywords(v, 0, "true false null");
+        for (int s : {SCE_JSON_ERROR, SCE_JSON_STRINGEOL}) Send(v, SCI_STYLESETBACK, s, RGB(0xFF, 0xC0, 0xC0));
+        Fore(v, SCE_JSON_LINECOMMENT, kComment); Fore(v, SCE_JSON_BLOCKCOMMENT, kComment);
+        Keywords(v, 0, "false null true");
         Send(v, SCI_SETPROPERTY, (uptr_t)"lexer.json.allow.comments", (sptr_t)"1");
+        Send(v, SCI_SETPROPERTY, (uptr_t)"lexer.json.escape.sequence", (sptr_t)"1");
     } else if ([lid isEqualToString:@"python"]) {
         Fore(v, SCE_P_COMMENTLINE, kComment); Fore(v, SCE_P_COMMENTBLOCK, kComment);
         Fore(v, SCE_P_NUMBER, kNumber);

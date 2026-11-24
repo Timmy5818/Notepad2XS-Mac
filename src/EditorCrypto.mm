@@ -146,6 +146,7 @@ static sptr_t SC(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0)
             doc.credential = cred;
             doc.pendingAutoDecrypt = NO;
             [self updateCryptoAppearance];
+            [self loadBookmarksAfterUnlock];   // 開檔時是密文：解密後才套用 .2xs 的書籤
             // 明文若無法用目前的 8-bit 編碼表示，改成 UTF-8（自動加密存檔時不受影響）
             N2Encoding enc = doc.encoding;
             if (enc == N2EncodingBig5 || enc == N2EncodingGB18030 || enc == N2EncodingShiftJIS || enc == N2EncodingWindows1252) {

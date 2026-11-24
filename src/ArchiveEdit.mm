@@ -105,7 +105,7 @@ BOOL N2IsEditableMemberName(NSString *name) {
             @"css", @"scss", @"less", @"js", @"mjs", @"cjs", @"jsx", @"ts", @"tsx", @"vue", @"c", @"h", @"cpp", @"cxx", @"cc",
             @"hpp", @"hxx", @"m", @"mm", @"java", @"kt", @"kts", @"cs", @"swift", @"py", @"pyw", @"rb", @"php", @"go", @"rs",
             @"sh", @"bash", @"zsh", @"command", @"bat", @"cmd", @"ps1", @"sql", @"mak", @"mk", @"diff", @"patch", @"reg",
-            @"rc", @"gradle", @"lua", @"pl", @"r", @"tex", @"srt", @"nfo", @"x60", @"u2f", @"jpg", @"jpeg"]];
+            @"rc", @"gradle", @"lua", @"pl", @"r", @"tex", @"srt", @"nfo", @"x60", @"u2f", @"jpg", @"jpeg", @"png", @"webp"]];
     });
     NSString *base = name.lastPathComponent.lowercaseString;
     if ([base isEqualToString:@"makefile"] || [base isEqualToString:@"readme"] || [base isEqualToString:@"license"]) return YES;

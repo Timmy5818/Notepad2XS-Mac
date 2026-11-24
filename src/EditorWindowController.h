@@ -3,6 +3,8 @@
 #import <Cocoa/Cocoa.h>
 #include "Scintilla.h"
 
+#import "BookmarkStore.h"
+
 @class ScintillaView, Document;
 
 typedef NS_OPTIONS(NSUInteger, N2FindOptions) {
@@ -33,6 +35,7 @@ static const NSInteger N2ReplaceAllReadOnly = -2;   // replaceAll：文件唯讀
 @property (nonatomic, readonly) ScintillaView *primarySci;
 @property (nonatomic, readonly) Document *doc;
 @property (nonatomic, readonly) NSArray<ScintillaView *> *allViews;   // 主要編輯區＋分割出來的第二個編輯區
+@property (nonatomic, readonly) N2BookmarkContext *bookmarks;          // 這份文件的書籤與檢視狀態（.2xs）
 
 - (void)loadDocumentText;      // 把 Document.loadedText 放進編輯區
 - (NSData *)textAsUTF8;        // 目前全文（UTF-8）
@@ -43,6 +46,8 @@ static const NSInteger N2ReplaceAllReadOnly = -2;   // replaceAll：文件唯讀
 - (NSString *)selectedText;
 - (void)updateStatus;
 - (BOOL)isActionAvailable:(SEL)action;   // 選單與工具列共用的停用規則
+- (BOOL)rejectIfReadOnly;                 // 文件鎖定時顯示提示並回傳 YES
+- (void)retile:(ScintillaView *)v;        // 邊界寬度改變後重新排版
 
 // 對作用中編輯區送 Scintilla 訊息
 - (sptr_t)send:(unsigned int)msg;
@@ -69,12 +74,30 @@ static const NSInteger N2ReplaceAllReadOnly = -2;   // replaceAll：文件唯讀
 - (void)runPendingAutoDecrypt;
 @end
 
+// 書籤、折疊、字元資訊、JSON、自動補括號（實作在 EditorNavigation.mm）
+@interface EditorWindowController (Navigation)
+- (void)applyNavigation:(ScintillaView *)v;
+- (void)refreshNavigationMargins:(ScintillaView *)v;
+- (void)navigationMarginClick:(SCNotification *)scn view:(ScintillaView *)v right:(BOOL)right;
+- (NSInteger)bookmarkLinesMatching:(NSString *)text options:(N2FindOptions)options;   // 行數；-1 規則有誤；-3 失敗
+- (void)loadBookmarks;
+- (void)loadBookmarksAfterUnlock;
+- (BOOL)saveBookmarks:(N2BookmarkSaveMode)mode;
+- (NSString *)characterInfoText;
+@end
+void N2InstallAutoPair(ScintillaView *v);
+
 // 多分頁（實作在 EditorTabs.mm）
 @interface EditorWindowController (Tabs)
 - (void)setupTabbing;
 - (void)ensureTabBarShown;
 @end
-void N2InstallTabMiddleClick(void);   // 滑鼠中鍵點分頁即關閉
+void N2InstallTabMiddleClick(void);   // 滑鼠中鍵點分頁即關閉、分頁列右鍵選單
+void N2SaveAllDocuments(void);
+void N2CloseAllDocuments(void (^completion)(BOOL closed));
+void N2SaveSession(void);
+BOOL N2HasSessionToRestore(void);
+void N2RestoreSession(void (^done)(BOOL restored));
 
 // 工具列（實作在 EditorToolbar.mm）
 @interface EditorWindowController (Toolbar) <NSToolbarDelegate>

@@ -8,6 +8,7 @@
 #import "ArchiveEdit.h"
 #import "AiUI.h"
 #import "Localization.h"
+#import "CryptoUI.h"
 #include "Scintilla.h"
 
 // 選單動作大多實作在 EditorWindowController（含 EditorCommands.mm），經由 responder chain 傳遞
@@ -71,6 +72,7 @@ void N2ShowFileSearch(void);
             if ([doc isKindOfClass:Document.class]) {
                 ((Document *)doc).archiveLink = link;
                 for (NSWindowController *wc in doc.windowControllers) [wc synchronizeWindowTitleWithDocumentName];
+                [((Document *)doc).editor loadBookmarks];   // 書籤設定檔在壓縮檔旁的 .2xs（名稱含成員路徑）
             } else {
                 [link cleanup];
             }
@@ -85,7 +87,10 @@ void N2ShowFileSearch(void);
 }
 @end
 
-@implementation AppDelegate
+@implementation AppDelegate {
+    BOOL _launched;    // 啟動流程（含還原分頁）已完成
+    BOOL _resetting;   // 恢復預設值後結束：不再寫入分頁紀錄
+}
 
 - (void)applicationWillFinishLaunching:(NSNotification *)n {
     [N2DocumentController new];   // 第一個建立的 NSDocumentController 會成為共用實例
@@ -98,7 +103,81 @@ void N2ShowFileSearch(void);
 // 沒有任何文件視窗時按 ⌘T：開一份新文件
 - (IBAction)newWindowForTab:(id)sender { [NSDocumentController.sharedDocumentController newDocument:sender]; }
 
-- (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender { return YES; }
+// 啟動時要還原上次的分頁：先不建立空白文件，還原失敗（檔案都不在了）才建立
+- (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender {
+    if (!_launched) return !N2HasSessionToRestore();
+    return YES;
+}
+
+- (void)applicationDidFinishLaunching:(NSNotification *)n {
+    if (!N2HasSessionToRestore()) { _launched = YES; return; }
+    N2RestoreSession(^(BOOL restored) {
+        self->_launched = YES;
+        if (!NSDocumentController.sharedDocumentController.documents.count)
+            [NSDocumentController.sharedDocumentController newDocument:nil];
+    });
+}
+
+// 結束時記錄目前的分頁，下次啟動還原（只記已存檔的文件）
+- (void)applicationWillTerminate:(NSNotification *)n { if (!_resetting) N2SaveSession(); }
+
+- (IBAction)saveAllDocuments:(id)sender { N2SaveAllDocuments(); }
+
+#pragma mark - Dock 選單（對應 Windows 版 R152 工作列「工作」）
+
+- (NSMenu *)applicationDockMenu:(NSApplication *)sender {
+    NSMenu *m = [[NSMenu alloc] initWithTitle:@""];
+    for (NSArray *it in @[@[@"新增分頁", NSStringFromSelector(@selector(dockNewTab:))],
+                          @[@"檔案搜尋", NSStringFromSelector(@selector(showFileSearch:))],
+                          @[@"關閉所有分頁", NSStringFromSelector(@selector(dockCloseAll:))],
+                          @[@"恢復應用預設值…", NSStringFromSelector(@selector(resetApplicationDefaults:))]]) {
+        NSMenuItem *mi = [m addItemWithTitle:N2L(it[0]) action:NSSelectorFromString(it[1]) keyEquivalent:@""];
+        mi.target = self;
+    }
+    return m;
+}
+
+static EditorWindowController *FrontEditor(void) {
+    for (NSWindow *w in NSApp.orderedWindows)
+        if ([w.windowController isKindOfClass:EditorWindowController.class] && w.isVisible) return (EditorWindowController *)w.windowController;
+    return nil;
+}
+
+// 在最近使用的視窗新增空白分頁；沒有視窗時開新文件
+- (IBAction)dockNewTab:(id)sender {
+    [NSApp activateIgnoringOtherApps:YES];
+    EditorWindowController *ed = FrontEditor();
+    if (ed) [ed newWindowForTab:sender];
+    else [NSDocumentController.sharedDocumentController newDocument:sender];
+}
+
+// 先處理未儲存的文件，再關閉所有分頁；下次開啟不會還原這些分頁
+- (IBAction)dockCloseAll:(id)sender {
+    [NSApp activateIgnoringOtherApps:YES];
+    N2CloseAllDocuments(nil);
+}
+
+// 恢復應用預設值：關閉所有文件後刪除本機設定、分頁還原紀錄、AES／EXES 預設密鑰、所有 AI API Key，再結束程式
+// AI 自訂範本與提示歷史保留
+- (IBAction)resetApplicationDefaults:(id)sender {
+    [NSApp activateIgnoringOtherApps:YES];
+    NSAlert *a = [NSAlert new];
+    a.alertStyle = NSAlertStyleWarning;
+    a.messageText = N2L(@"要恢復應用預設值嗎？");
+    a.informativeText = N2L(@"會先關閉所有文件，接著刪除本機設定、分頁還原紀錄、AES／EXES 預設密鑰設定，並清除所有人工智慧 API Key，然後結束程式。人工智慧自訂範本與提示歷史會保留。");
+    [a addButtonWithTitle:N2L(@"恢復預設值")];
+    [a addButtonWithTitle:N2L(@"取消")];
+    if ([a runModal] != NSAlertFirstButtonReturn) return;
+    N2CloseAllDocuments(^(BOOL closed) {
+        if (!closed) return;   // 有文件取消儲存：不重設
+        [NSUserDefaults.standardUserDefaults removePersistentDomainForName:NSBundle.mainBundle.bundleIdentifier];
+        [NSUserDefaults.standardUserDefaults synchronize];
+        N2ClearDefaultKeys();
+        N2AiClearApiKeys();
+        self->_resetting = YES;
+        [NSApp terminate:nil];
+    });
+}
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app { return YES; }
 
 - (IBAction)showPreferences:(id)sender { [N2PreferencesWindow.shared showWindow:sender]; }
@@ -155,7 +234,10 @@ void N2ShowFileSearch(void);
     Item(file, @"關閉", @selector(performClose:), @"w");
     Item(file, @"儲存", @selector(saveDocument:), @"s");
     Item(file, @"另存新檔…", @selector(saveDocumentAs:), @"s", C | S);
+    Item(file, @"全部儲存", @selector(saveAllDocuments:), @"s", C | O);
     Item(file, @"回復到已儲存", @selector(revertDocumentToSaved:), nil);
+    Item(file, @"重新載入", @selector(reloadFromDisk:), @"r", C | O);
+    Item(file, @"在 Finder 中顯示", @selector(revealInFinder:), @"r", C | S);
     Sep(file);
     NSMenu *enc = Submenu(file, @"編碼（存檔用）");
     NSMenu *reopen = Submenu(file, @"以指定編碼重新載入");
@@ -185,6 +267,7 @@ void N2ShowFileSearch(void);
     Item(edit, @"貼上", @selector(paste:), @"v");
     Item(edit, @"刪除", @selector(clear:), nil);
     Item(edit, @"全選", @selector(selectAll:), @"a");
+    Item(edit, @"顯示字元資訊…", @selector(showCharacterInfo:), nil);
     Sep(edit);
     Item(edit, @"尋找…", @selector(showFindPanel:), @"f");
     Item(edit, @"取代…", @selector(showReplacePanel:), @"f", C | O);
@@ -192,8 +275,14 @@ void N2ShowFileSearch(void);
     Item(edit, @"找上一個", @selector(findPreviousText:), @"g", C | S);
     Item(edit, @"使用選取的文字尋找", @selector(useSelectionForFind:), @"e");
     Item(edit, @"跳至行…", @selector(goToLine:), @"l");
+    NSMenu *bookmarks = Submenu(edit, @"行書籤");
+    Item(bookmarks, @"循環切換目前行書籤", @selector(toggleBookmark:), Key(NSF2FunctionKey), C);
+    Item(bookmarks, @"下一個書籤", @selector(nextBookmark:), Key(NSF2FunctionKey), O);
+    Item(bookmarks, @"上一個書籤", @selector(previousBookmark:), Key(NSF2FunctionKey), O | S);
+    Item(bookmarks, @"清除所有書籤", @selector(clearBookmarks:), nil);
     Sep(edit);
     Item(edit, @"表格模式（CSV／TSV）…", @selector(showCsvTable:), nil);
+    Item(edit, @"排版模式（HTML）…", @selector(showHtmlLayout:), nil);
     Sep(edit);
     NSMenu *lineOps = Submenu(edit, @"行操作");
     Item(lineOps, @"上移", @selector(moveLineUp:), Key(NSUpArrowFunctionKey), C | O);
@@ -225,6 +314,7 @@ void N2ShowFileSearch(void);
     Item(view, @"重設工具列", @selector(resetToolbar:), nil);
     Item(view, @"狀態列", @selector(toggleStatusBar:), nil);
     Item(view, @"行號", @selector(toggleLineNumbers:), nil);
+    Item(view, @"顯示書籤欄", @selector(toggleBookmarkMargin:), nil);
     Item(view, @"縮排輔助線", @selector(toggleIndentGuides:), nil);
     Item(view, @"長行標記", @selector(toggleLongLineMarker:), nil);
     NSMenu *marks = Submenu(view, @"顯示字元與符號");
@@ -241,6 +331,11 @@ void N2ShowFileSearch(void);
     Item(split, @"不分割", @selector(splitNone:), nil);
     Item(split, @"上下分割", @selector(splitHorizontal:), nil);
     Item(split, @"左右分割", @selector(splitVertical:), nil);
+    Sep(view);
+    NSMenu *outline = Submenu(view, @"大綱");
+    Item(outline, @"顯示折疊邊界", @selector(toggleCodeFolding:), nil);
+    Item(outline, @"折疊／展開目前區塊", @selector(toggleFoldBlock:), nil);
+    Item(outline, @"展開所有區塊", @selector(expandAllFolds:), nil);
     Sep(view);
     Item(view, @"放大", @selector(zoomInText:), @"=");
     Item(view, @"縮小", @selector(zoomOutText:), @"-");
@@ -278,6 +373,8 @@ void N2ShowFileSearch(void);
     Item(indent, @"減少縮排", @selector(unindentLines:), @"[");
     Item(indent, @"自動縮排", @selector(toggleAutoIndent:), nil);
     Item(indent, @"以空格代替定位字元", @selector(toggleTabsAsSpaces:), nil);
+    Item(indent, @"自動補括號", @selector(toggleAutoPairBrackets:), nil);
+    Item(indent, @"自動補引號", @selector(toggleAutoPairQuotes:), nil);
     Sep(indent);
     Item(indent, @"將空格轉為定位字元", @selector(convertSpacesToTabs:), nil);
     Item(indent, @"將定位字元轉為空格", @selector(convertTabsToSpaces:), nil);
@@ -347,6 +444,9 @@ void N2ShowFileSearch(void);
     NSMenu *html = Submenu(tools, @"HTML 處理");
     Item(html, @"移除 HTML 標籤", @selector(stripHTMLTags:), nil);
     Item(html, @"逸出 HTML 標籤", @selector(escapeHTML:), nil);
+    NSMenu *json = Submenu(tools, @"JSON 處理");
+    Item(json, @"格式化 JSON", @selector(formatJsonPretty:), nil);
+    Item(json, @"壓縮 JSON", @selector(formatJsonMinify:), nil);
 
     // 視窗
     NSMenu *window = Submenu(main, @"視窗");
@@ -367,6 +467,8 @@ void N2ShowFileSearch(void);
              @selector(selectTabByNumber:), [NSString stringWithFormat:@"%d", i], C, i);
     Item(window, @"顯示所有分頁", @selector(toggleTabOverview:), @"\\", C | S);
     Item(window, @"將分頁移至新視窗", @selector(moveTabToNewWindow:), nil);
+    Item(window, @"關閉其他分頁", @selector(closeOtherTabs:), nil);
+    Item(window, @"關閉全部分頁", @selector(closeAllTabs:), nil);
     Item(window, @"合併所有視窗", @selector(mergeAllWindows:), nil);
     Sep(window);
     Item(window, @"將此程式所有視窗移至最前", @selector(arrangeInFront:), nil);

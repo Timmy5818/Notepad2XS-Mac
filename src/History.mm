@@ -168,7 +168,7 @@ void N2HistoryPrune(NSURL *target) {
     NSError *err = nil;
     Document *copy = [NSDocumentController.sharedDocumentController openUntitledDocumentAndDisplay:NO error:&err];
     if (![copy isKindOfClass:Document.class]) { if (err) [self presentError:err]; return; }
-    [copy loadRawData:raw jpeg:[@[@"jpg", @"jpeg"] containsObject:_target.pathExtension.lowercaseString] error:&err];
+    [copy loadRawData:raw imageURL:_target error:&err];
     [copy makeWindowControllers];
     [copy showWindows];
 }
@@ -180,7 +180,7 @@ void N2HistoryPrune(NSURL *target) {
     NSData *raw = [NSData dataWithContentsOfFile:e.path];
     void (^go)(void) = ^{
         NSError *err = nil;
-        if (![doc loadRawData:raw jpeg:[@[@"jpg", @"jpeg"] containsObject:self->_target.pathExtension.lowercaseString] error:&err]) { [self presentError:err]; return; }
+        if (![doc loadRawData:raw imageURL:self->_target error:&err]) { [self presentError:err]; return; }
         [doc updateChangeCount:NSChangeDone];   // 還原後保持「尚未儲存」，按儲存才寫回磁碟
     };
     if (!doc.isDocumentEdited) { go(); return; }

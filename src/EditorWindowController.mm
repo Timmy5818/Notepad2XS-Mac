@@ -69,6 +69,7 @@ static const CGFloat kStatusBarHeight = 22;
     N2SplitMode _splitMode;
     NSUInteger _modCount;
     BOOL _forceDirty;   // 加解密清空復原紀錄後：Scintilla 會把目前狀態當成儲存點，存檔前都要保持「未儲存」
+    N2BookmarkContext *_bookmarks;
 }
 
 - (instancetype)init {
@@ -80,6 +81,7 @@ static const CGFloat kStatusBarHeight = 22;
     win.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
     if ((self = [super initWithWindow:win])) {
         win.delegate = self;
+        _bookmarks = [N2BookmarkContext new];
         self.shouldCascadeWindows = YES;
         [self buildViews];
         [self setupToolbar];
@@ -87,6 +89,9 @@ static const CGFloat kStatusBarHeight = 22;
         [self applySettings];
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(settingsChanged:)
                                                    name:N2SettingsChangedNotification object:nil];
+        // 結束程式時記錄檢視狀態（游標、捲動、縮放）
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(appWillTerminate:)
+                                                   name:NSApplicationWillTerminateNotification object:nil];
         static BOOL firstWindow = YES;
         if (firstWindow) {
             firstWindow = NO;
@@ -104,6 +109,7 @@ static const CGFloat kStatusBarHeight = 22;
 }
 
 - (ScintillaView *)primarySci { return _primary; }
+- (N2BookmarkContext *)bookmarks { return _bookmarks; }
 - (Document *)doc { return (Document *)self.document; }
 
 // 作用中的編輯區：焦點在第二個編輯區時用它，否則用主要編輯區
@@ -197,6 +203,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
     S(v, SCI_SETTABINDENTS, 1);
     S(v, SCI_SETBACKSPACEUNINDENTS, 1);
     S(v, SCI_SETWHITESPACESIZE, 2);
+    N2InstallAutoPair(v);
     return v;
 }
 
@@ -303,6 +310,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
     S(v, SCI_SETCARETLINEVISIBLE, N2Settings.highlightCurrentLine);
     if (!N2Settings.matchBraces) S(v, SCI_BRACEHIGHLIGHT, (uptr_t)-1, -1);
     if (restyle) [self applyLockAppearance:v];
+    [self applyNavigation:v];
     [self updateLineNumberMargin:v force:YES];
     [self updateHighlights:v];
 }
@@ -312,6 +320,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
         NSString *lang = self.doc ? self.doc.effectiveLanguageID : @"text";
         N2SyntaxApply(v, lang, N2Settings.fontName, N2Settings.fontSize, N2Settings.invertColors);
         [self applyLockAppearance:v];
+        [self applyNavigation:v];
         [self updateLineNumberMargin:v force:YES];
     }
     [self updateStatus];
@@ -377,6 +386,9 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
     if (_secondary) S(_secondary, SCI_GOTOPOS, 0);
     _loading = NO;
     [self updateCryptoAppearance];
+    // 重新開檔／重新載入：清除舊書籤，讀取 .2xs 的書籤與檢視狀態（密文要等解密後）
+    for (int m : {N2BlueBookmark, N2RedBookmark, N2SearchBookmark}) S(v, SCI_MARKERDELETEALL, m);
+    [self loadBookmarks];
     // 密文：等視窗顯示後詢問密碼
     if (doc.pendingAutoDecrypt)
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -448,7 +460,12 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
         case SCN_CHARADDED:
             [self autoIndent:v character:scn->ch];
             break;
+        case SCN_MARGINCLICK:
+        case SCN_MARGINRIGHTCLICK:
+            [self navigationMarginClick:scn view:v right:scn->nmhdr.code == SCN_MARGINRIGHTCLICK];
+            break;
         case SCN_ZOOM:
+            [self refreshNavigationMargins:v];
             [self updateLineNumberMargin:v force:YES];
             [self updateStatus];
             break;
@@ -839,6 +856,11 @@ static int SciFlags(N2FindOptions o) {
     if (a == @selector(exesEncrypt:) || a == @selector(exesDecrypt:) || a == @selector(aesEncrypt:) || a == @selector(aesDecrypt:))
         return [self send:SCI_GETLENGTH] > 0;
     if (a == @selector(showVersionHistory:)) return doc.fileURL != nil && !doc.archiveLink;
+    if (a == @selector(showCharacterInfo:)) return !doc.isCryptoLocked;
+    if (a == @selector(showHtmlLayout:)) return [doc.effectiveLanguageID isEqualToString:@"html"] && !doc.isCryptoLocked;
+    if (a == @selector(formatJsonPretty:) || a == @selector(formatJsonMinify:))
+        return !doc.isCryptoLocked && [self send:SCI_GETLENGTH] > 0;
+    if (a == @selector(toggleFoldBlock:) || a == @selector(expandAllFolds:)) return [self send:SCI_GETMARGINWIDTHN w:2] > 0;
     if (a == @selector(secureEraseFile:)) return doc.fileURL != nil || doc.archiveLink != nil;
     return YES;
 }
@@ -867,12 +889,16 @@ static int SciFlags(N2FindOptions o) {
         {@selector(splitVertical:), _splitMode == N2SplitVertical},
         {@selector(toggleToolbarVisible:), self.window.toolbar.visible},
         {@selector(toggleAlwaysOnTop:), self.window.level == NSFloatingWindowLevel},
+        {@selector(toggleCodeFolding:), N2Settings.codeFolding},
+        {@selector(toggleBookmarkMargin:), N2Settings.bookmarkMargin},
+        {@selector(toggleAutoPairBrackets:), N2Settings.autoPairBrackets},
+        {@selector(toggleAutoPairQuotes:), N2Settings.autoPairQuotes},
     };
     for (auto &t : toggles) if (a == t.sel) { item.state = t.on ? NSControlStateValueOn : NSControlStateValueOff; return YES; }
 
     if (a == @selector(setLineEnding:)) item.state = (doc.eolMode == item.tag);
     else if (a == @selector(setSaveEncoding:)) item.state = (doc.encoding == item.tag);
-    else if (a == @selector(reopenWithEncoding:)) return doc.fileURL != nil && !doc.isJpegDocument;
+    else if (a == @selector(reopenWithEncoding:)) return doc.fileURL != nil && !doc.isImageDocument;
     else if (a == @selector(selectLanguage:)) {
         NSArray *ids = N2SyntaxLanguageIDs();
         if (item.tag < 0) item.state = (doc.languageID == nil);
@@ -893,5 +919,10 @@ static int SciFlags(N2FindOptions o) {
 }
 
 - (void)windowDidResize:(NSNotification *)n { [self updateStatus]; }
+
+// 切換分頁、關閉、結束程式時記錄檢視狀態（只有變動時才寫入 .2xs）
+- (void)windowDidResignMain:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
+- (void)windowWillClose:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
+- (void)appWillTerminate:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
 
 @end

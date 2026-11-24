@@ -5,23 +5,29 @@
 #include "Scintilla.h"
 #include "ExAlgorithms.h"
 #include "AesAlgorithms.h"
-#include "JpegCommentFormat.h"
+#include "ImageCommentFormat.h"
 #import "History.h"
 #import <Security/SecRandom.h>
 
 @implementation Document {
     NSData *_loadedText;
     NSData *_pendingSaveData;   // 已加密好、要直接寫入的位元組
-    NSData *_jpegOriginal;      // JPEG 文件：原始圖片位元組（存檔時只替換 COM）
+    NSData *_imageOriginal;     // 圖片文件（JPG／PNG／WebP）：原始圖片位元組（存檔時只替換 Notepad2XS 自己的區塊）
     NSURL *_saveTargetURL;      // 這次存檔的目的地
     NSUInteger _savedModCount;  // dataOfType 取文字時編輯區的修改次數
     NSData *_saveSnapshot;      // 存檔開始時（主執行緒）取下的全文；背景寫入時使用
 }
 
-static BOOL IsJpeg(NSURL *u) {
+// 依副檔名判斷圖片格式（與 Windows 版 imageFormatForPath 相同）
+static xs::image::Format ImageFormat(NSURL *u) {
     NSString *e = u.pathExtension.lowercaseString;
-    return [e isEqualToString:@"jpg"] || [e isEqualToString:@"jpeg"];
+    if ([e isEqualToString:@"jpg"] || [e isEqualToString:@"jpeg"]) return xs::image::Format::Jpeg;
+    if ([e isEqualToString:@"png"]) return xs::image::Format::Png;
+    if ([e isEqualToString:@"webp"]) return xs::image::Format::Webp;
+    return xs::image::Format::Unknown;
 }
+static BOOL IsImage(NSURL *u) { return u && ImageFormat(u) != xs::image::Format::Unknown; }
+BOOL N2IsImageTextURL(NSURL *u) { return IsImage(u); }
 
 - (instancetype)init {
     if ((self = [super init])) {
@@ -98,74 +104,88 @@ static BOOL IsJpeg(NSURL *u) {
     }
 }
 
-#pragma mark - JPEG 內嵌文字（N2XSJPG1 COM，格式沿用 Windows 版 JpegCommentFormat）
+#pragma mark - 圖片內嵌文字（JPG：N2XSJPG1 COM；PNG：iTXt／附加區塊；WebP：RIFF 區塊；格式沿用 Windows 版 ImageCommentFormat）
 
-static NSError *JpegError(NSString *msg, const std::string &detail) {
-    return [NSError errorWithDomain:@"Notepad2XS.JPEG" code:1 userInfo:@{NSLocalizedDescriptionKey: msg,
+static NSError *ImageError(NSString *msg, const std::string &detail) {
+    return [NSError errorWithDomain:@"Notepad2XS.Image" code:1 userInfo:@{NSLocalizedDescriptionKey: msg,
         NSLocalizedRecoverySuggestionErrorKey: [NSString stringWithUTF8String:detail.c_str()] ?: @""}];
 }
 
-- (BOOL)readJpeg:(NSData *)data error:(NSError **)outError {
-    if (data.length > 512ull * 1024 * 1024) { if (outError) *outError = JpegError(@"JPEG 檔案超過 512 MiB。", ""); return NO; }
+- (BOOL)readImage:(NSData *)data format:(xs::image::Format)format error:(NSError **)outError {
+    if (data.length > 512ull * 1024 * 1024) { if (outError) *outError = ImageError(@"圖片檔案超過 512 MiB。", ""); return NO; }
     std::vector<uint8_t> v((const uint8_t *)data.bytes, (const uint8_t *)data.bytes + data.length);
-    xs::jpeg::Payload p;
+    xs::image::Payload p;
     std::string err;
-    if (!xs::jpeg::extract(v, p, err)) { if (outError) *outError = JpegError(@"無法讀取 JPEG 內嵌文字。", err); return NO; }
-    if (p.mode == xs::jpeg::Mode::Text && !xs::jpeg::validUtf8(p.bytes)) { if (outError) *outError = JpegError(@"JPEG 內嵌文字不是有效的 UTF-8。", ""); return NO; }
-    _jpegOriginal = data;
-    // TXT 模式是權威標記：即使文字以 X60 開頭也不會跳出密碼視窗
+    if (!xs::image::extract(format, v, p, err)) { if (outError) *outError = ImageError(@"無法讀取圖片內嵌文字。", err); return NO; }
+    if (p.mode == xs::image::Mode::Text && !xs::jpeg::validUtf8(p.bytes)) { if (outError) *outError = ImageError(@"圖片內嵌文字不是有效的 UTF-8。", ""); return NO; }
+    _imageOriginal = data;
+    // TXT 模式是權威標記：即使文字以 X60 開頭也不會跳出密碼視窗；普通圖片開啟空白編輯區
     [self applyLoadedText:[NSData dataWithBytes:p.bytes.data() length:p.bytes.size()] encoding:N2EncodingUTF8
-             detectCrypto:p.mode != xs::jpeg::Mode::Text];
+             detectCrypto:p.mode != xs::image::Mode::Text];
     return YES;
 }
 
 - (BOOL)readFromURL:(NSURL *)url ofType:(NSString *)typeName error:(NSError **)outError {
-    _jpegOriginal = nil;
-    if (IsJpeg(url)) {
+    _imageOriginal = nil;
+    if (IsImage(url)) {
         NSData *data = [NSData dataWithContentsOfURL:url options:0 error:outError];
-        return data && [self readJpeg:data error:outError];
+        return data && [self readImage:data format:ImageFormat(url) error:outError];
     }
     return [super readFromURL:url ofType:typeName error:outError];
 }
 
-- (BOOL)loadRawData:(NSData *)raw jpeg:(BOOL)jpeg error:(NSError **)error {
-    if (jpeg) return [self readJpeg:raw error:error];
+- (BOOL)loadRawData:(NSData *)raw imageURL:(NSURL *)imageURL error:(NSError **)error {
+    if (IsImage(imageURL)) return [self readImage:raw format:ImageFormat(imageURL) error:error];
     return [self readFromData:raw ofType:@"public.plain-text" error:error];
 }
 
-// 產生要寫入 JPEG 的完整位元組：底圖沿用原圖／既有目的檔／內建預設底圖
-- (NSData *)jpegDataFor:(NSURL *)target text:(NSData *)utf8 error:(NSError **)outError {
+// 產生要寫入圖片的完整位元組：底圖沿用原圖／既有目的檔／內建預設底圖（與 JPG 相同圖案）
+- (NSData *)imageDataFor:(NSURL *)target text:(NSData *)utf8 error:(NSError **)outError {
+    xs::image::Format format = ImageFormat(target);
     NSData *base = nil;
-    if (_jpegOriginal && [target.path isEqualToString:self.fileURL.path]) base = _jpegOriginal;
+    if (_imageOriginal && [target.path isEqualToString:self.fileURL.path] && ImageFormat(self.fileURL) == format) base = _imageOriginal;
     else if ([NSFileManager.defaultManager fileExistsAtPath:target.path]) base = [NSData dataWithContentsOfURL:target];
-    else base = [NSData dataWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"JpegDefaultArtwork" ofType:@"jpg"]];
-    if (!base) { if (outError) *outError = JpegError(@"找不到 JPEG 底圖。", ""); return nil; }
-    xs::jpeg::Mode mode = xs::jpeg::Mode::Text;
+    else {
+        NSString *name = format == xs::image::Format::Png ? @"PngDefaultArtwork" : format == xs::image::Format::Webp ? @"WebpDefaultArtwork" : @"JpegDefaultArtwork";
+        NSString *ext = format == xs::image::Format::Png ? @"png" : format == xs::image::Format::Webp ? @"webp" : @"jpg";
+        base = [NSData dataWithContentsOfFile:[NSBundle.mainBundle pathForResource:name ofType:ext]];
+    }
+    if (!base) { if (outError) *outError = ImageError(@"找不到圖片底圖。", ""); return nil; }
+    xs::image::Mode mode = xs::image::Mode::Text;
     std::string bytes((const char *)utf8.bytes, utf8.length);
     if (_pendingSaveData) {   // 加密後的密文
         bytes.assign((const char *)_pendingSaveData.bytes, _pendingSaveData.length);
-        mode = N2CryptoDetect(bytes.data(), bytes.size()) == N2CryptoEXES ? xs::jpeg::Mode::Exes : xs::jpeg::Mode::Aes;
+        mode = N2CryptoDetect(bytes.data(), bytes.size()) == N2CryptoEXES ? xs::image::Mode::Exes : xs::image::Mode::Aes;
     }
+    if (bytes.size() > 128ull * 1024 * 1024) { if (outError) *outError = ImageError(@"圖片內嵌文字或密文超過 128 MiB 上限。", ""); return nil; }
+    // 只有 JPG 需要文件識別碼（串起分段的 COM）
     std::array<uint8_t, 16> docId{};
-    if (SecRandomCopyBytes(kSecRandomDefault, docId.size(), docId.data()) != errSecSuccess) {
-        if (outError) *outError = JpegError(@"無法產生 JPEG 文件識別碼。", "");
+    if (format == xs::image::Format::Jpeg && SecRandomCopyBytes(kSecRandomDefault, docId.size(), docId.data()) != errSecSuccess) {
+        if (outError) *outError = ImageError(@"無法產生 JPEG 文件識別碼。", "");
         return nil;
     }
     std::vector<uint8_t> original((const uint8_t *)base.bytes, (const uint8_t *)base.bytes + base.length), result;
     std::string err;
-    if (!xs::jpeg::replace(original, mode, bytes, docId, result, err)) { if (outError) *outError = JpegError(@"無法寫入 JPEG 內嵌文字。", err); return nil; }
+    if (!xs::image::replace(format, original, mode, bytes, docId, result, err)) { if (outError) *outError = ImageError(@"無法寫入圖片內嵌文字。", err); return nil; }
+    if (result.size() > 512ull * 1024 * 1024) { if (outError) *outError = ImageError(@"加入文字後圖片超過 512 MiB 安全上限。", ""); return nil; }
+    // 寫入前再讀回一次，確認圖片結構與內嵌資料完整
+    xs::image::Payload verify;
+    if (!xs::image::extract(format, result, verify, err) || !verify.found || verify.mode != mode || verify.bytes != bytes) {
+        if (outError) *outError = ImageError(@"圖片內嵌資料寫入後完整性驗證失敗。", err);
+        return nil;
+    }
     return [NSData dataWithBytes:result.data() length:result.size()];
 }
 
-- (BOOL)isJpegDocument { return self.fileURL && IsJpeg(self.fileURL); }
+- (BOOL)isImageDocument { return IsImage(self.fileURL); }
 
 - (BOOL)reloadWithEncoding:(N2Encoding)encoding error:(NSError **)error {
     if (!self.fileURL) return NO;
-    // JPEG：內嵌文字固定以 UTF-8 寫在 COM 區段，整個檔案不能當成文字解碼（存回去會毀掉圖片）
-    if (IsJpeg(self.fileURL)) {
+    // 圖片：內嵌文字固定以 UTF-8 寫在圖片區塊，整個檔案不能當成文字解碼（存回去會毀掉圖片）
+    if (IsImage(self.fileURL)) {
         if (error) *error = [NSError errorWithDomain:@"Notepad2XS" code:3 userInfo:@{
-            NSLocalizedDescriptionKey: @"JPEG 文件不能用其他編碼重新載入。",
-            NSLocalizedRecoverySuggestionErrorKey: @"JPEG 內嵌文字固定使用 UTF-8。"}];
+            NSLocalizedDescriptionKey: @"圖片文件不能用其他編碼重新載入。",
+            NSLocalizedRecoverySuggestionErrorKey: @"圖片內嵌文字固定使用 UTF-8。"}];
         return NO;
     }
     NSData *raw = [NSData dataWithContentsOfURL:self.fileURL options:0 error:error];
@@ -191,7 +211,7 @@ static NSError *JpegError(NSString *msg, const std::string &detail) {
     if (!utf8) { if (NSThread.isMainThread) grab(); else dispatch_sync(dispatch_get_main_queue(), grab); }
     if (!utf8) utf8 = _loadedText;
     NSURL *target = _saveTargetURL ?: self.fileURL;
-    if (IsJpeg(target)) return [self jpegDataFor:target text:utf8 error:outError];   // JPEG：文字一律 UTF-8 寫入 COM
+    if (IsImage(target)) return [self imageDataFor:target text:utf8 error:outError];   // 圖片：文字一律 UTF-8 寫入圖片區塊
     if (_pendingSaveData) return _pendingSaveData;   // 加密後的 ASCII 密文
     return N2EncodeFromUTF8((const char *)utf8.bytes, utf8.length, self.encoding, outError);
 }
@@ -205,7 +225,7 @@ static NSError *JpegError(NSString *msg, const std::string &detail) {
     // 背景寫入時：暫存檔已寫好，接下來的壓縮檔回存可能很久，先讓使用者繼續操作
     if (!NSThread.isMainThread) [self unblockUserInteraction];
     if (ok && userSave && !N2IsArchiveWorkURL(url)) N2HistoryPrune(url);
-    if (ok && IsJpeg(url) && saveOperation != NSSaveToOperation) _jpegOriginal = [NSData dataWithContentsOfURL:url];
+    if (ok && IsImage(url) && saveOperation != NSSaveToOperation) _imageOriginal = [NSData dataWithContentsOfURL:url];
     // 壓縮檔內文件：暫存檔寫好後，寫回壓縮檔（驗證通過才替換原檔）
     if (ok && self.archiveLink && [url.path isEqualToString:self.archiveLink.workURL.path] &&
         (saveOperation == NSSaveOperation || saveOperation == NSSaveAsOperation)) {
@@ -351,14 +371,26 @@ completionHandler:(void (^)(NSError *))handler {
         // 在主執行緒先取下全文與修改次數：壓縮檔回存在背景執行，背景不能再回主執行緒取文字
         self->_saveSnapshot = [self.editor textAsUTF8];
         self->_savedModCount = self.editor.modificationCount;
+        BOOL newTarget = op == NSSaveAsOperation || !self.fileURL;
         [super saveToURL:url ofType:typeName forSaveOperation:op completionHandler:^(NSError *e) {
             self->_pendingSaveData = nil;
             self->_saveTargetURL = nil;
             self->_saveSnapshot = nil;
             [self.editor updateCryptoAppearance];
+            // 存檔成功：書籤一併寫入 .2xs（另存新檔把目前的書籤帶到新文件）
+            if (!e && (op == NSSaveOperation || op == NSSaveAsOperation))
+                [self.editor saveBookmarks:newTarget ? N2BookmarkSaveNewTarget : N2BookmarkSaveSavedFile];
             handler(e);
         }];
     }];
+}
+
+// 文件沒有修改、只增刪了書籤時按 ⌘S：只更新 .2xs，不重寫文件（與 Windows 版相同）
+- (IBAction)saveDocument:(id)sender {
+    if (!self.isDocumentEdited && self.fileURL && [NSFileManager.defaultManager fileExistsAtPath:self.fileURL.path] &&
+        [self.editor saveBookmarks:N2BookmarkSaveChanged])
+        return;
+    [super saveDocument:sender];
 }
 
 // 壓縮檔內文件：回存（解開、重建、驗證）可能很久，改在背景寫入，畫面不會卡住

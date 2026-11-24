@@ -36,12 +36,14 @@ typedef NS_ENUM(NSInteger, N2CryptoState) {
 
 // 壓縮檔內文件：存檔後自動寫回壓縮檔
 @property (nonatomic, strong) N2ArchiveLink *archiveLink;
-@property (nonatomic, readonly) BOOL isJpegDocument;   // 檔案是 JPEG（文字內嵌在 COM 區段）
+@property (nonatomic, readonly) BOOL isImageDocument;   // 檔案是 JPG／PNG／WebP（文字內嵌在圖片區塊）
 
 // 載入原始位元組（版本歷史還原／開啟複本用）
-- (BOOL)loadRawData:(NSData *)raw jpeg:(BOOL)jpeg error:(NSError **)error;
+- (BOOL)loadRawData:(NSData *)raw imageURL:(NSURL *)imageURL error:(NSError **)error;   // imageURL 是圖片時依圖片格式解讀
 
 // 用指定編碼重新讀取磁碟上的檔案（會捨棄未儲存的修改）
 - (BOOL)reloadWithEncoding:(N2Encoding)encoding error:(NSError **)error;
 
 @end
+
+BOOL N2IsImageTextURL(NSURL *url);   // .jpg／.jpeg／.png／.webp

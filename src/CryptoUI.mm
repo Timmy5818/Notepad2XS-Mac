@@ -80,6 +80,8 @@ static NSString *GeneratePassword(void) {
 static NSString *const kKeychainService = @"Notepad2XS 預設密鑰";
 static NSString *const kKeychainAccount = @"default";
 
+void N2ClearDefaultKeys(void) { N2KeychainWrite(kKeychainService, kKeychainAccount, nil); }
+
 @implementation N2DefaultKeys
 
 + (N2DefaultKeys *)load {

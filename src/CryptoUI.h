@@ -29,6 +29,8 @@ N2CryptoAlgorithm N2CryptoDetect(const char *text, size_t length);
 - (BOOL)save:(NSError **)error;
 @end
 
+void N2ClearDefaultKeys(void);   // 恢復應用預設值：刪除鑰匙圈裡的預設密鑰
+
 // 密碼視窗：以 sheet 顯示，完成時回傳來源憑證（nil = 取消）
 @interface N2PasswordDialog : NSWindowController
 + (void)runForWindow:(NSWindow *)parent algorithm:(N2CryptoAlgorithm)algorithm encrypt:(BOOL)encrypt

@@ -12,6 +12,9 @@ ARCHFLAGS=""; for a in $ARCH; do ARCHFLAGS="$ARCHFLAGS -arch $a"; done
 MINOS="${MINOS:-11.0}"
 BUILD="$ROOT/build"
 APP="$BUILD/Notepad2XS.app"
+# UITEST=1 ./build.sh：另外建置含自動操作測試工具的版本（build/uitest/，獨立的設定與鑰匙圈），正式版不含
+UITEST="${UITEST:-0}"
+[[ "$UITEST" == 1 ]] && APP="$BUILD/uitest/Notepad2XS.app"
 
 if [[ "${1:-}" == "clean" ]]; then rm -rf "$BUILD"; echo "已清除 $BUILD"; exit 0; fi
 
@@ -49,24 +52,34 @@ for src in "$ROOT"/src/*.mm; do
   OBJS+=("$obj")
 done
 
+if [[ "$UITEST" == 1 ]]; then
+  for src in "$ROOT"/tests/uitest/*.mm; do
+    obj="$OBJ/uitest_$(basename "$src").o"
+    clang++ "${FLAGS[@]}" -c "$src" -o "$obj"
+    OBJS+=("$obj")
+  done
+fi
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/zh_TW.lproj"
 clang++ $ARCHFLAGS -mmacosx-version-min="$MINOS" "${OBJS[@]}" "$BUILD/libscintilla.a" \
-  -framework Cocoa -framework QuartzCore -framework Carbon -framework Security -liconv -lz \
+  -framework Cocoa -framework QuartzCore -framework Carbon -framework Security -framework WebKit -liconv -lz \
   -o "$APP/Contents/MacOS/Notepad2XS"
 
 cp "$ROOT/resources/Info.plist" "$APP/Contents/Info.plist"
+[[ "$UITEST" == 1 ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier local.notepad2xs.mac.uitest" "$APP/Contents/Info.plist"
 # Scintilla 需要的游標圖（它找 .tiff）
 for n in mac_cursor_busy mac_cursor_flipped info_bar_bg; do
   tiffutil -cathidpicheck "$SCI/cocoa/res/$n.png" "$SCI/cocoa/res/$n@2x.png" \
     -out "$APP/Contents/Resources/$n.tiff" >/dev/null 2>&1
 done
-# 8 種語言：讓系統的開啟／儲存等視窗也以對應語言顯示
-for l in zh_TW en ja zh_CN ko fr de ru; do
+# 12 種語言：讓系統的開啟／儲存等視窗也以對應語言顯示
+for l in zh_TW en ja zh_CN ko fr de ru es pt_BR it pl; do
   mkdir -p "$APP/Contents/Resources/$l.lproj"
   echo '"CFBundleName" = "Notepad2XS";' > "$APP/Contents/Resources/$l.lproj/InfoPlist.strings"
 done
-cp "$ROOT/resources/JpegDefaultArtwork.jpg" "$ROOT/resources/AppIcon.icns" "$APP/Contents/Resources/"
+cp "$ROOT/resources/Localization.json" "$ROOT/resources/JpegDefaultArtwork.jpg" "$ROOT/resources/PngDefaultArtwork.png" "$ROOT/resources/WebpDefaultArtwork.webp" \
+   "$ROOT/resources/AppIcon.icns" "$APP/Contents/Resources/"
 
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "OK: ${APP}（$(lipo -archs "$APP/Contents/MacOS/Notepad2XS")）"

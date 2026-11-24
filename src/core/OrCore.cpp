@@ -248,6 +248,11 @@ j::object saveService(AiProvider provider, const AiServiceSettings &service) {
       (!service.model.empty() && !validAiModel(provider, service.model)) ||
       service.models.size() > 1000)
     fail(u8"AI 金鑰、模型或清單格式不正確。");
+  if (!service.endpoint.empty() &&
+      !aiValidEndpoint(provider, service.endpoint))
+    fail(u8"AI 服務網址格式不正確。");
+  if (!aiRequiresKey(provider) && !service.key.empty())
+    fail(u8"本機 Ollama 不需要 API Key。");
   j::array models;
   std::vector<std::string> seen;
   for (const auto &m : service.models) {
@@ -258,12 +263,15 @@ j::object saveService(AiProvider provider, const AiServiceSettings &service) {
     seen.push_back(m.id);
     models.emplace_back(j::object{{"id", m.id}, {"label", m.label}});
   }
-  return {{"key", service.key}, {"model", service.model}, {"models", models}};
+  return {{"key", service.key}, {"model", service.model}, {"models", models},
+          {"endpoint", service.endpoint}};
 }
 AiServiceSettings loadService(const j::value &value) {
   AiServiceSettings out;
   out.key = string(field(value, "key"));
   out.model = string(field(value, "model"));
+  if (const auto *endpoint = value.as_object().if_contains("endpoint"))
+    out.endpoint = string(*endpoint);
   const auto &models = field(value, "models");
   if (!models.is_array() || models.as_array().size() > 1000)
     fail(u8"AI 模型清單格式不正確。");
@@ -271,12 +279,35 @@ AiServiceSettings loadService(const j::value &value) {
     out.models.push_back({string(field(m, "id")), string(field(m, "label"))});
   return out;
 }
+constexpr std::size_t newIndex(AiProvider provider) {
+  return static_cast<std::size_t>(provider) - static_cast<std::size_t>(AiProvider::openai);
+}
+}
+bool aiIsNewProvider(AiProvider provider) {
+  return provider >= AiProvider::openai && provider < AiProvider::count;
+}
+bool aiUsesEndpoint(AiProvider provider) {
+  return provider == AiProvider::ollama || provider == AiProvider::azure;
+}
+bool aiRequiresKey(AiProvider provider) { return provider != AiProvider::ollama; }
+bool aiListsModels(AiProvider provider) {
+  return provider != AiProvider::openRouter && provider != AiProvider::azure &&
+         provider < AiProvider::count;
+}
+namespace {
 const char *providerCode(AiProvider provider) {
   switch (provider) {
   case AiProvider::openRouter: return "openrouter";
   case AiProvider::google: return "google";
   case AiProvider::nvidia: return "nvidia";
   case AiProvider::deepseek: return "deepseek";
+  case AiProvider::openai: return "openai";
+  case AiProvider::claude: return "claude";
+  case AiProvider::ollama: return "ollama";
+  case AiProvider::azure: return "azure";
+  case AiProvider::groq: return "groq";
+  case AiProvider::grok: return "grok";
+  case AiProvider::count: break;
   }
   fail(u8"AI 服務設定不正確。");
 }
@@ -311,8 +342,15 @@ std::string orSavePreferences(const OrPreferences &p) {
       if (p.googleModels[k].id == m.id)
         fail(u8"模型清單包含重複項目。");
   }
+  j::object additional;
+  for (auto provider = static_cast<int>(AiProvider::openai);
+       provider < static_cast<int>(AiProvider::count); ++provider) {
+    const auto type = static_cast<AiProvider>(provider);
+    additional[providerCode(type)] = saveService(type, p.additional[newIndex(type)]);
+  }
   const auto json = j::serialize(j::object{
-      {"version", 4},
+      {"version", 5},
+      {"additional", additional},
       {"nvidia", saveService(AiProvider::nvidia, p.nvidia)},
       {"deepseek", saveService(AiProvider::deepseek, p.deepseek)},
       {"templates", templates},
@@ -330,7 +368,7 @@ OrPreferences orLoadPreferences(const std::string &json) {
   auto v = parse(json);
   const auto &version = field(v, "version");
   if (!version.is_int64() ||
-      (version.as_int64() < 1 || version.as_int64() > 4))
+      (version.as_int64() < 1 || version.as_int64() > 5))
     fail(u8"人工智慧設定版本不支援。");
   OrPreferences p;
   p.key = string(field(v, "key"));
@@ -338,11 +376,14 @@ OrPreferences orLoadPreferences(const std::string &json) {
     fail(u8"儲存的金鑰格式不正確。");
   if (version.as_int64() >= 2) {
     const auto provider = string(field(v, "provider"));
-    if (provider == "openrouter") p.provider = AiProvider::openRouter;
-    else if (provider == "google") p.provider = AiProvider::google;
-    else if (version.as_int64() == 4 && provider == "nvidia") p.provider = AiProvider::nvidia;
-    else if (version.as_int64() == 4 && provider == "deepseek") p.provider = AiProvider::deepseek;
-    else fail(u8"AI 服務設定不正確。");
+    const auto limit = version.as_int64() >= 5 ? AiProvider::count
+        : version.as_int64() == 4 ? AiProvider::openai : AiProvider::nvidia;
+    int index = 0;
+    while (index < static_cast<int>(limit) &&
+           provider != providerCode(static_cast<AiProvider>(index)))
+      ++index;
+    if (index == static_cast<int>(limit)) fail(u8"AI 服務設定不正確。");
+    p.provider = static_cast<AiProvider>(index);
     p.googleKey = string(field(v, "googleKey"));
     p.googleModel = string(field(v, "googleModel"));
     const auto &models = field(v, "googleModels");
@@ -352,9 +393,16 @@ OrPreferences orLoadPreferences(const std::string &json) {
       p.googleModels.push_back(
           {string(field(m, "id")), string(field(m, "label"))});
   }
-  if (version.as_int64() == 4) {
+  if (version.as_int64() >= 4) {
     p.nvidia = loadService(field(v, "nvidia"));
     p.deepseek = loadService(field(v, "deepseek"));
+  }
+  if (version.as_int64() >= 5) {
+    const auto &extra = field(v, "additional");
+    for (int i = static_cast<int>(AiProvider::openai); i < static_cast<int>(AiProvider::count); ++i) {
+      const auto type = static_cast<AiProvider>(i);
+      p.additional[newIndex(type)] = loadService(field(extra, providerCode(type)));
+    }
   }
   if (version.as_int64() >= 3) {
     const auto &templates = field(v, "templates");
@@ -412,6 +460,13 @@ const char *aiProviderName(AiProvider p) {
     return "NVIDIA";
   case AiProvider::deepseek:
     return "DeepSeek";
+  case AiProvider::openai: return "OpenAI";
+  case AiProvider::claude: return "Claude (Anthropic)";
+  case AiProvider::ollama: return "Ollama";
+  case AiProvider::azure: return "Azure OpenAI";
+  case AiProvider::groq: return "Groq";
+  case AiProvider::grok: return "Grok (xAI)";
+  case AiProvider::count: break;
   }
   fail(u8"AI 服務設定不正確。");
 }
@@ -421,15 +476,24 @@ const char *aiKeyPage(AiProvider provider) {
   case AiProvider::google: return "https://aistudio.google.com/apikey";
   case AiProvider::nvidia: return "https://build.nvidia.com/";
   case AiProvider::deepseek: return "https://platform.deepseek.com/api_keys";
+  case AiProvider::openai: return "https://platform.openai.com/api-keys";
+  case AiProvider::claude: return "https://platform.claude.com/settings/keys";
+  case AiProvider::ollama: return "https://ollama.com/download";
+  case AiProvider::azure: return "https://ai.azure.com/";
+  case AiProvider::groq: return "https://console.groq.com/keys";
+  case AiProvider::grok: return "https://console.x.ai/";
+  case AiProvider::count: break;
   }
   fail(u8"AI 服務設定不正確。");
 }
 const std::string &OrPreferences::activeKey() const {
+  if (aiIsNewProvider(provider)) return additional[newIndex(provider)].key;
   switch (provider) {
   case AiProvider::openRouter: return key;
   case AiProvider::google: return googleKey;
   case AiProvider::nvidia: return nvidia.key;
   case AiProvider::deepseek: return deepseek.key;
+  default: break;
   }
   fail(u8"AI 服務設定不正確。");
 }
@@ -437,6 +501,7 @@ std::string &OrPreferences::activeKey() {
   return const_cast<std::string &>(static_cast<const OrPreferences *>(this)->activeKey());
 }
 const std::string &OrPreferences::activeModel() const {
+  if (aiIsNewProvider(provider)) return additional[newIndex(provider)].model;
   switch (provider) {
   case AiProvider::google: return googleModel;
   case AiProvider::nvidia: return nvidia.model;
@@ -448,6 +513,7 @@ std::string &OrPreferences::activeModel() {
   return const_cast<std::string &>(static_cast<const OrPreferences *>(this)->activeModel());
 }
 const std::vector<AiModel> &OrPreferences::activeModels() const {
+  if (aiIsNewProvider(provider)) return additional[newIndex(provider)].models;
   switch (provider) {
   case AiProvider::google: return googleModels;
   case AiProvider::nvidia: return nvidia.models;
@@ -457,6 +523,19 @@ const std::vector<AiModel> &OrPreferences::activeModels() const {
 }
 std::vector<AiModel> &OrPreferences::activeModels() {
   return const_cast<std::vector<AiModel> &>(static_cast<const OrPreferences *>(this)->activeModels());
+}
+const std::string &OrPreferences::activeEndpoint() const {
+  static const std::string empty;
+  return aiUsesEndpoint(provider) ? additional[newIndex(provider)].endpoint : empty;
+}
+std::string &OrPreferences::activeEndpoint() {
+  if (!aiUsesEndpoint(provider)) fail(u8"此服務使用固定網址。");
+  return additional[newIndex(provider)].endpoint;
+}
+bool aiConnectionReady(const OrPreferences &p) {
+  return (!aiRequiresKey(p.provider) || validOrKey(p.activeKey())) &&
+         validAiModel(p.provider, aiSelectedModel(p)) &&
+         aiValidEndpoint(p.provider, p.activeEndpoint());
 }
 std::string aiSelectedModel(const OrPreferences &p) {
   aiProviderName(p.provider);
@@ -475,13 +554,29 @@ bool validGoogleModel(const std::string &model) {
 bool validAiModel(AiProvider provider, const std::string &model) {
   if (provider == AiProvider::google) return validGoogleModel(model);
   if (provider == AiProvider::openRouter) return model == "openrouter/free";
-  if (provider != AiProvider::nvidia && provider != AiProvider::deepseek) return false;
-  if (model.empty() || model.size() > 200 || model.front() == '/' ||
+  if (provider != AiProvider::nvidia && provider != AiProvider::deepseek &&
+      !aiIsNewProvider(provider)) return false;
+  if (model.empty() || model.size() > 200) return false;
+  if (provider == AiProvider::ollama) {
+    auto name = model;
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+      return static_cast<char>(c >= 'A' && c <= 'Z' ? c + 'a' - 'A' : c);
+    });
+    for (const auto *suffix : {":cloud", "-cloud", "-cloud:latest"}) {
+      const std::string_view ending(suffix);
+      if (name.size() >= ending.size() &&
+          name.compare(name.size() - ending.size(), ending.size(), ending) == 0)
+        return false;
+    }
+  }
+  if (model.front() == '/' ||
       model.back() == '/' || model.find("..") != model.npos ||
       model.find("//") != model.npos) return false;
-  return std::all_of(model.begin(), model.end(), [](unsigned char c) {
+  return std::all_of(model.begin(), model.end(), [provider](unsigned char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-           (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '/';
+           (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' ||
+           (c == '/' && provider != AiProvider::azure) ||
+           (c == ':' && (provider == AiProvider::ollama || provider == AiProvider::openai));
   });
 }
 std::string queryEscape(const std::string &input) {
@@ -502,8 +597,53 @@ std::string queryEscape(const std::string &input) {
   }
   return out;
 }
+namespace {
+AiEndpoint customEndpoint(AiProvider provider, std::string url) {
+  if (url.empty() && provider == AiProvider::ollama)
+    url = "http://127.0.0.1:11434";
+  if (url.size() > 512) fail(u8"AI 服務網址格式不正確。");
+  std::transform(url.begin(), url.end(), url.begin(), [](unsigned char c) {
+    return static_cast<char>(c >= 'A' && c <= 'Z' ? c + 'a' - 'A' : c);
+  });
+  if (provider == AiProvider::ollama && url.compare(0, 7, "http://") == 0) {
+    auto host = url.substr(7);
+    if (!host.empty() && host.back() == '/') host.pop_back();
+    const auto colon = host.rfind(':');
+    unsigned port = 11434;
+    if (colon != host.npos && host != "[::1]") {
+      const auto digits = host.substr(colon + 1);
+      if (digits.empty() || digits.size() > 5 ||
+          digits.find_first_not_of("0123456789") != digits.npos)
+        fail(u8"AI 服務網址格式不正確。");
+      port = static_cast<unsigned>(std::stoul(digits));
+      host.resize(colon);
+    }
+    if (port && port <= 65535 && (host == "localhost" || host == "127.0.0.1" || host == "[::1]"))
+      return {host == "localhost" ? "127.0.0.1" : host, {}, {},
+              static_cast<unsigned short>(port), false};
+  }
+  if (provider == AiProvider::azure && url.compare(0, 8, "https://") == 0) {
+    auto host = url.substr(8);
+    if (!host.empty() && host.back() == '/') host.pop_back();
+    if (host.size() > 10 && host.compare(host.size()-10, 10, "/openai/v1") == 0)
+      host.resize(host.size()-10);
+    const auto dot = host.find('.');
+    if (dot > 0 && dot <= 63 && host.front() != '-' && host[dot - 1] != '-' &&
+        host.substr(0, dot).find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") == host.npos &&
+        (host.substr(dot) == ".openai.azure.com" || host.substr(dot) == ".services.ai.azure.com"))
+      return {host, {}, {}};
+  }
+  fail(u8"AI 服務網址格式不正確。");
+}
+}
+bool aiValidEndpoint(AiProvider provider, const std::string &endpoint) {
+  if (!aiUsesEndpoint(provider)) return endpoint.empty();
+  try { customEndpoint(provider, endpoint); return true; }
+  catch (const std::runtime_error &) { return false; }
+}
 AiEndpoint aiEndpoint(AiProvider provider, AiOperation operation,
-                      const std::string &model, const std::string &page) {
+                      const std::string &model, const std::string &page,
+                      const std::string &endpoint) {
   aiProviderName(provider);
   if (provider == AiProvider::openRouter) {
     if (operation == AiOperation::generate)
@@ -520,31 +660,60 @@ AiEndpoint aiEndpoint(AiProvider provider, AiOperation operation,
       return {"generativelanguage.googleapis.com", "POST",
               "/v1beta/" + model + ":generateContent"};
   } else {
-    const std::string host = provider == AiProvider::nvidia
-        ? "integrate.api.nvidia.com" : "api.deepseek.com";
-    if (operation == AiOperation::listModels && page.empty())
-      return {host, "GET", provider == AiProvider::nvidia ? "/v1/models" : "/models"};
-    if (operation == AiOperation::generate && validAiModel(provider, model))
-      return {host, "POST", provider == AiProvider::nvidia
-          ? "/v1/chat/completions" : "/chat/completions"};
+    AiEndpoint route;
+    std::string base = "/v1";
+    switch (provider) {
+    case AiProvider::nvidia: route.host = "integrate.api.nvidia.com"; break;
+    case AiProvider::deepseek: route.host = "api.deepseek.com"; base.clear(); break;
+    case AiProvider::openai: route.host = "api.openai.com"; break;
+    case AiProvider::claude: route.host = "api.anthropic.com"; break;
+    case AiProvider::groq: route.host = "api.groq.com"; base = "/openai/v1"; break;
+    case AiProvider::grok: route.host = "api.x.ai"; break;
+    case AiProvider::azure: route = customEndpoint(provider, endpoint); base = "/openai/v1"; break;
+    case AiProvider::ollama: route = customEndpoint(provider, endpoint); base = "/api"; break;
+    default: fail(u8"AI 服務設定不正確。");
+    }
+    if (operation == AiOperation::listModels && aiListsModels(provider) &&
+        (page.empty() || provider == AiProvider::claude)) {
+      route.method = "GET";
+      route.path = base + (provider == AiProvider::ollama ? "/tags" : "/models");
+      if (provider == AiProvider::claude && !page.empty())
+        route.path += "?after_id=" + queryEscape(page);
+      return route;
+    }
+    if (operation == AiOperation::generate && validAiModel(provider, model)) {
+      route.method = "POST";
+      route.path = base + (provider == AiProvider::ollama ? "/chat"
+          : provider == AiProvider::claude ? "/messages" : "/chat/completions");
+      return route;
+    }
   }
   fail(u8"AI 操作或模型不正確，請重新選擇模型。");
 }
 std::string aiRequest(AiProvider provider, const std::string &instruction,
-                      const std::string &text, const std::string &model) {
+                      const std::string &text, const std::string &model, bool stream) {
   aiProviderName(provider);
   if (utf16Length(instruction) > 4096)
     fail(u8"請輸入有效指令（最多 4096 個 UTF-16 字元）。");
   auto original = parse(orRequest(instruction, text));
   if (provider == AiProvider::openRouter)
     return j::serialize(original);
-  if (provider == AiProvider::nvidia || provider == AiProvider::deepseek) {
+  if (provider != AiProvider::google) {
     if (!validAiModel(provider, model)) fail(u8"請先選擇有效的模型。");
     auto &request = original.as_object();
     request["model"] = model;
+    if (aiIsNewProvider(provider)) request["stream"] = stream;
+    if (provider == AiProvider::claude) {
+      auto &messages = request.at("messages").as_array();
+      j::value system = messages[0].at("content");
+      messages.erase(messages.begin());
+      request["system"] = std::move(system);
+      request["max_tokens"] = 8192;   // Mac 版：由 4096 提高，較長的改寫也能完成
+    }
     request.erase("temperature"); // Use each model's supported sampling defaults.
     if (provider == AiProvider::deepseek) request["max_tokens"] = 8192;
-    else if (model == "openai/gpt-oss-20b" || model == "openai/gpt-oss-120b") {
+    else if (provider == AiProvider::nvidia &&
+             (model == "openai/gpt-oss-20b" || model == "openai/gpt-oss-120b")) {
       request["max_tokens"] = 4096;
       request["reasoning_effort"] = "medium";
     }
@@ -571,6 +740,8 @@ std::pair<std::string, std::string> aiPromptContents(
             string(body.at("contents").as_array().at(0).at("parts").as_array().at(0).at("text"))};
   }
   const auto &messages = body.at("messages").as_array();
+  if (provider == AiProvider::claude)
+    return {string(body.at("system")), string(messages.at(0).at("content"))};
   return {string(messages.at(0).at("content")), string(messages.at(1).at("content"))};
 }
 void googleStatus(unsigned status) {
@@ -586,9 +757,145 @@ void googleStatus(unsigned status) {
     fail(u8"Google AI 額度或頻率已達限制，請稍後再試。原文未變更。");
   fail(u8"Google AI 未正常回應，原文未變更。");
 }
+namespace {
+bool hasValue(const j::value &v, const char *name) {
+  const auto *item = v.as_object().if_contains(name);
+  return item && !item->is_null();
+}
+void checkTextMessage(const j::value &message) {
+  if (hasValue(message, "refusal") || hasValue(message, "function_call"))
+    fail(u8"AI 拒絕處理這次請求，原文未變更。");
+  if (const auto *tools = message.as_object().if_contains("tool_calls");
+      tools && !tools->is_null() && (!tools->is_array() || !tools->as_array().empty()))
+    fail(u8"AI 回傳工具呼叫，無法當作文件文字套用。");
+}
+std::string checkedAnswer(std::string answer) {
+  if (answer.size() > 1024 * 1024 || blank(answer) || answer.find('\0') != answer.npos)
+    fail(u8"AI 未回傳有效文字或結果過長，原文未變更。");
+  return answer;
+}
+void incompleteStream() {
+  fail(u8"AI 串流回答未正常結束，原文未變更。");
+}
+// Mac 版：答覆因長度上限被截斷時給出明確說明
+void stopReason(const std::string &reason, const char *normal) {
+  if (reason == normal) return;
+  if (reason == "max_tokens" || reason == "length")
+    fail(u8"AI 答覆超過長度上限而被截斷，原文未變更。請縮小選取範圍後再試。");
+  incompleteStream();
+}
+}
+AiStream::AiStream(AiProvider service) : provider(service) {}
+void AiStream::append(const std::string &text) {
+  if (complete || answer.size() + text.size() > 1024 * 1024 ||
+      text.find('\0') != text.npos)
+    incompleteStream();
+  answer += text;
+}
+void AiStream::record(const std::string &data) {
+  if (data == "[DONE]" && provider != AiProvider::claude && provider != AiProvider::ollama) {
+    if (!stopped || complete) incompleteStream();
+    complete = true;
+    return;
+  }
+  if (complete) incompleteStream();
+  const auto v = parse(data);
+  if (v.as_object().contains("error")) incompleteStream();
+  if (provider == AiProvider::ollama) {
+    const auto &message = field(v, "message");
+    checkTextMessage(message);
+    append(string(field(message, "content")));
+    if (field(v, "done").as_bool()) {
+      stopReason(string(field(v, "done_reason")), "stop");
+      complete = true;
+    }
+    return;
+  }
+  if (provider == AiProvider::claude) {
+    const auto type = string(field(v, "type"));
+    if (type == "error") incompleteStream();
+    if (type == "content_block_start") {
+      const auto &block = field(v, "content_block");
+      const auto kind = string(field(block, "type"));
+      if (kind == "text") append(string(field(block, "text")));
+      else if (kind != "thinking" && kind != "redacted_thinking") incompleteStream();
+    } else if (type == "content_block_delta") {
+      const auto &delta = field(v, "delta");
+      const auto kind = string(field(delta, "type"));
+      if (kind == "text_delta") append(string(field(delta, "text")));
+      else if (kind == "input_json_delta") incompleteStream();
+    } else if (type == "message_delta") {
+      const auto &delta = field(v, "delta");
+      if (hasValue(delta, "stop_reason")) {
+        stopReason(string(field(delta, "stop_reason")), "end_turn");
+        stopped = true;
+      }
+    } else if (type == "message_stop") {
+      if (!stopped) incompleteStream();
+      complete = true;
+    }
+    return;
+  }
+  const auto &choices = field(v, "choices").as_array();
+  if (choices.empty()) return; // Usage or Azure prompt-filter metadata.
+  if (stopped || choices.size() != 1) incompleteStream();
+  const auto &choice = choices.front();
+  const auto &delta = field(choice, "delta");
+  checkTextMessage(delta);
+  if (hasValue(delta, "content")) append(string(field(delta, "content")));
+  if (hasValue(choice, "finish_reason")) {
+    stopReason(string(field(choice, "finish_reason")), "stop");
+    stopped = true;
+  }
+}
+bool AiStream::feed(const char *bytes, std::size_t size) {
+  const auto previous = answer.size();
+  pending.append(bytes, size);
+  std::size_t start = 0;
+  for (auto end = pending.find('\n'); end != pending.npos; end = pending.find('\n', start)) {
+    auto line = pending.substr(start, end - start);
+    start = end + 1;
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (provider == AiProvider::ollama) {
+      if (!line.empty()) record(line);
+    } else if (line.empty()) {
+      if (!event.empty()) record(event);
+      event.clear();
+    } else if (line.compare(0, 5, "data:") == 0) {
+      if (!event.empty()) event += '\n';
+      event += line.substr(line.size() > 5 && line[5] == ' ' ? 6 : 5);
+    }
+  }
+  pending.erase(0, start);
+  return previous != answer.size();
+}
+std::string AiStream::finish() const {
+  if (!complete || !pending.empty() || !event.empty()) incompleteStream();
+  return checkedAnswer(answer);
+}
 std::string aiAnswer(AiProvider provider, unsigned status,
                      const std::string &body) {
   aiProviderName(provider);
+  if (provider == AiProvider::claude || provider == AiProvider::ollama) {
+    chatStatus(provider, status);
+    const auto v = parse(body);
+    if (v.as_object().contains("error")) incompleteStream();
+    if (provider == AiProvider::ollama) {
+      if (!field(v, "done").as_bool()) incompleteStream();
+      stopReason(string(field(v, "done_reason")), "stop");
+      const auto &message = field(v, "message");
+      checkTextMessage(message);
+      return checkedAnswer(string(field(message, "content")));
+    }
+    stopReason(string(field(v, "stop_reason")), "end_turn");
+    std::string answer;
+    for (const auto &item : field(v, "content").as_array()) {
+      const auto type = string(field(item, "type"));
+      if (type == "text") answer += string(field(item, "text"));
+      else if (type != "thinking" && type != "redacted_thinking") incompleteStream();
+    }
+    return checkedAnswer(std::move(answer));
+  }
   if (provider != AiProvider::google)
     return chatAnswer(provider, status, body);
   googleStatus(status);
@@ -722,57 +1029,68 @@ std::vector<AiModel> googleModels(
 }
 bool aiSameConnection(const OrPreferences &a, const OrPreferences &b) {
   return a.provider == b.provider && a.activeKey() == b.activeKey() &&
-         aiSelectedModel(a) == aiSelectedModel(b);
+         aiSelectedModel(a) == aiSelectedModel(b) && a.activeEndpoint() == b.activeEndpoint();
 }
 std::vector<AiModel> aiModels(AiProvider provider,
     const std::function<std::pair<unsigned, std::string>(const std::string &)> &fetch) {
   if (provider == AiProvider::google) return googleModels(fetch);
-  if (provider != AiProvider::nvidia && provider != AiProvider::deepseek)
-    fail(u8"此服務不支援取得模型清單。");
-  auto response = fetch("");
-  chatStatus(provider, response.first);
-  const auto value = parse(response.second);
-  if (value.as_object().contains("error")) fail(u8"模型清單取得失敗。");
-  if (const auto *more = value.as_object().if_contains("has_more")) {
-    if (!more->is_bool() || more->as_bool())
-      fail(u8"模型清單不完整，未更新原清單。");
-  }
-  const auto &data = field(value, "data");
-  if (!data.is_array() || data.as_array().size() > 1000)
-    fail(u8"模型清單格式不正確或超過 1000 筆。");
+  if (!aiListsModels(provider)) fail(u8"此服務不支援取得模型清單。");
   std::vector<AiModel> result;
-  for (const auto &item : data.as_array()) {
-    auto id = string(field(item, "id"));
-    if (!validAiModel(provider, id)) continue;
-    auto lower = id;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
-      return static_cast<char>(c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c);
-    });
-    bool text = true;
-    for (auto excluded : {"embed", "rerank", "diffusion", "stable-", "flux",
-                          "whisper", "parakeet", "canary", "tts", "speech",
-                          "riva", "cosmos", "trellis", "clip-vit", "nvclip",
-                          "video", "deplot", "nemotron-parse", "reward",
-                          "guard", "content-safety", "topic-control", "ising-calibration"})
-      if (lower.find(excluded) != lower.npos) text = false;
-    // Some catalogs include modalities; when provided, honor them instead of
-    // assuming that every listed model accepts and returns text.
-    for (auto key : {"input_modalities", "output_modalities"}) {
-      if (const auto *modes = item.as_object().if_contains(key)) {
-        if (!modes->is_array()) fail(u8"模型功能格式不正確。");
-        bool found = false;
-        for (const auto &mode : modes->as_array())
-          if (string(mode) == "text") found = true;
-        text = text && found;
+  std::vector<std::string> seen;
+  std::string page;
+  for (;;) {
+    auto response = fetch(page);
+    chatStatus(provider, response.first);
+    const auto value = parse(response.second);
+    if (value.as_object().contains("error")) fail(u8"模型清單取得失敗。");
+    const auto &data = field(value, provider == AiProvider::ollama ? "models" : "data");
+    if (!data.is_array() || data.as_array().size() > 1000)
+      fail(u8"模型清單格式不正確或超過 1000 筆。");
+    for (const auto &item : data.as_array()) {
+      if (provider == AiProvider::ollama && hasValue(item, "remote_host")) continue;
+      auto id = string(field(item, provider == AiProvider::ollama ? "name" : "id"));
+      if (!validAiModel(provider, id)) continue;
+      auto lower = id;
+      std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c);
+      });
+      bool text = true;
+      for (auto excluded : {"embed", "rerank", "diffusion", "stable-", "flux",
+                            "whisper", "parakeet", "canary", "tts", "speech",
+                            "riva", "cosmos", "trellis", "clip-vit", "nvclip",
+                            "video", "deplot", "nemotron-parse", "reward",
+                            "guard", "content-safety", "topic-control", "ising-calibration",
+                            "moderation", "dall-e", "gpt-image", "grok-imagine", "realtime"})
+        if (lower.find(excluded) != lower.npos) text = false;
+      // Some catalogs include modalities; when provided, honor them instead of
+      // assuming that every listed model accepts and returns text.
+      for (auto key : {"input_modalities", "output_modalities"}) {
+        if (const auto *modes = item.as_object().if_contains(key)) {
+          if (!modes->is_array()) fail(u8"模型功能格式不正確。");
+          bool found = false;
+          for (const auto &mode : modes->as_array())
+            if (string(mode) == "text") found = true;
+          text = text && found;
+        }
       }
+      if (!text) continue;
+      auto label = id;
+      if (const auto *name = item.as_object().if_contains(
+          provider == AiProvider::claude ? "display_name" : "name")) label = string(*name);
+      if (label.empty() || label.size() > 512 || label.find('\0') != label.npos)
+        fail(u8"模型名稱格式不正確。");
+      if (std::none_of(result.begin(), result.end(), [&](const AiModel &m) { return m.id == id; }))
+        result.push_back({std::move(id), std::move(label)});
     }
-    if (!text) continue;
-    auto label = id;
-    if (const auto *name = item.as_object().if_contains("name")) label = string(*name);
-    if (label.empty() || label.size() > 512 || label.find('\0') != label.npos)
-      fail(u8"模型名稱格式不正確。");
-    if (std::none_of(result.begin(), result.end(), [&](const AiModel &m) { return m.id == id; }))
-      result.push_back({std::move(id), std::move(label)});
+    if (result.size() > 1000) fail(u8"模型清單過大，未更新原清單。");
+    const auto *more = value.as_object().if_contains("has_more");
+    if (!more || !more->as_bool()) break;
+    if (provider != AiProvider::claude || seen.size() >= 19)
+      fail(u8"模型清單不完整，未更新原清單。");
+    page = string(field(value, "last_id"));
+    if (page.empty() || std::find(seen.begin(), seen.end(), page) != seen.end())
+      fail(u8"模型分頁重複，未更新原清單。");
+    seen.push_back(page);
   }
   if (result.empty()) fail(u8"未找到可用的文字模型，請檢查帳號權限與模型供應。");
   std::sort(result.begin(), result.end(), [](const AiModel &a, const AiModel &b) { return a.id < b.id; });
@@ -786,6 +1104,7 @@ void aiCopySettings(OrPreferences &target, const OrPreferences &source) {
   target.googleModels = source.googleModels;
   target.nvidia = source.nvidia;
   target.deepseek = source.deepseek;
+  target.additional = source.additional;
 }
 void aiMergeSettings(OrPreferences &latest, const OrPreferences &before,
                      const OrPreferences &draft) {
@@ -793,7 +1112,8 @@ void aiMergeSettings(OrPreferences &latest, const OrPreferences &before,
       latest.googleKey != before.googleKey ||
       latest.googleModel != before.googleModel ||
       latest.googleModels != before.googleModels ||
-      latest.nvidia != before.nvidia || latest.deepseek != before.deepseek)
+      latest.nvidia != before.nvidia || latest.deepseek != before.deepseek ||
+      latest.additional != before.additional)
     fail(u8"人工智慧連接設定已由其他視窗變更，請關閉後重新開啟設定。");
   orSavePreferences(draft);
   aiCopySettings(latest, draft);

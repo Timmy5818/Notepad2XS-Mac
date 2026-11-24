@@ -18,3 +18,4 @@
 
 // 對編輯視窗執行 AI 指令
 void N2AiRunForEditor(EditorWindowController *editor);
+void N2AiClearApiKeys(void);   // 恢復應用預設值：清除所有服務的 API Key（範本與提示歷史保留）

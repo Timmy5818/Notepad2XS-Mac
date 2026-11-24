@@ -90,6 +90,7 @@
     [v addSubview:[self button:N2L(@"找上一個") frame:NSMakeRect(348, 104, 112, 30) action:@selector(findPrevClicked:)]];
     [v addSubview:[self button:N2L(@"取代") frame:NSMakeRect(348, 72, 112, 30) action:@selector(replaceClicked:)]];
     [v addSubview:[self button:N2L(@"全部取代") frame:NSMakeRect(348, 40, 112, 30) action:@selector(replaceAllClicked:)]];
+    [v addSubview:[self button:N2L(@"標記符合的行") frame:NSMakeRect(348, 8, 112, 30) action:@selector(bookmarkClicked:)]];
 }
 
 - (NSString *)findString { return _findField.stringValue ?: @""; }
@@ -172,6 +173,17 @@
     _status.stringValue = n ? [NSString stringWithFormat:N2L(@"已取代 %ld 處"), (long)n]
                             : [NSString stringWithFormat:N2L(@"找不到「%@」"), self.findString];
     if (!n) NSBeep();
+}
+
+// 標記符合的行：搜尋書籤（取代上一次的搜尋書籤，手動書籤保留）
+- (void)bookmarkClicked:(id)sender {
+    EditorWindowController *ed = self.editor;
+    if (!ed || self.findString.length == 0) { NSBeep(); return; }
+    NSInteger n = [ed bookmarkLinesMatching:self.findString options:self.options];
+    if (n == -1) { [self report:N2FindInvalidPattern]; return; }
+    _status.stringValue = n < 0 ? N2L(@"無法完成搜尋。已保留原有書籤。")
+                                : [NSString stringWithFormat:N2L(@"搜尋書籤已更新：%d 行。"), (int)n];
+    if (n <= 0) NSBeep();
 }
 
 @end

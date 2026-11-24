@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <functional>
 #include <string>
 #include <utility>
@@ -6,7 +7,7 @@
 namespace xs {
 constexpr std::size_t orInputLimit = 128 * 1024;
 constexpr std::size_t orResponseLimit = 2 * 1024 * 1024;
-enum class AiProvider { openRouter, google, nvidia, deepseek };
+enum class AiProvider { openRouter, google, nvidia, deepseek, openai, claude, ollama, azure, groq, grok, count };
 enum class AiOperation { generate, listModels, checkKey };
 enum class AiOutputMode { replace, insertBelow, newWindow, displayOnly };
 struct AiTemplate {
@@ -29,18 +30,35 @@ struct AiModel {
     return id == other.id && label == other.label;
   }
 };
+class AiStream {
+public:
+  explicit AiStream(AiProvider provider);
+  bool feed(const char *bytes, std::size_t size);
+  const std::string &text() const { return answer; }
+  std::string finish() const;
+private:
+  void record(const std::string &data);
+  void append(const std::string &text);
+  AiProvider provider;
+  std::string pending, event, answer;
+  bool complete = false, stopped = false;
+};
 struct AiModelPage {
   std::vector<AiModel> models;
   std::string next;
 };
 struct AiEndpoint {
   std::string host, method, path;
+  unsigned short port = 443;
+  bool secure = true;
 };
 struct AiServiceSettings {
   std::string key, model;
   std::vector<AiModel> models;
+  std::string endpoint{};
   bool operator==(const AiServiceSettings &other) const {
-    return key == other.key && model == other.model && models == other.models;
+    return key == other.key && model == other.model && models == other.models &&
+           endpoint == other.endpoint;
   }
   bool operator!=(const AiServiceSettings &other) const { return !(*this == other); }
 };
@@ -49,6 +67,9 @@ struct OrPreferences {
   AiProvider provider = AiProvider::openRouter;
   std::vector<AiModel> googleModels;
   AiServiceSettings nvidia, deepseek;
+  std::array<AiServiceSettings, 6> additional;
+  const std::string &activeEndpoint() const;
+  std::string &activeEndpoint();
   const std::string &activeKey() const;
   std::string &activeKey();
   const std::string &activeModel() const;
@@ -58,15 +79,25 @@ struct OrPreferences {
   std::vector<std::string> prompts;
   std::vector<AiTemplate> templates = aiDefaultTemplates();
   ~OrPreferences() {
-    for (auto *secret : {&key, &googleKey, &nvidia.key, &deepseek.key}) {
-      if (!secret->empty()) {
-        volatile char *p = &(*secret)[0];
-        for (std::size_t i = 0; i < secret->size(); ++i)
+    const auto wipe = [](std::string &secret) {
+      if (!secret.empty()) {
+        volatile char *p = &secret[0];
+        for (std::size_t i = 0; i < secret.size(); ++i)
           p[i] = 0;
       }
-    }
+    };
+    for (auto *secret : {&key, &googleKey, &nvidia.key, &deepseek.key})
+      wipe(*secret);
+    for (auto &service : additional)
+      wipe(service.key);
   }
 };
+bool aiIsNewProvider(AiProvider provider);
+bool aiUsesEndpoint(AiProvider provider);
+bool aiValidEndpoint(AiProvider provider, const std::string &endpoint);
+bool aiRequiresKey(AiProvider provider);
+bool aiListsModels(AiProvider provider);
+bool aiConnectionReady(const OrPreferences &prefs);
 const char *aiProviderName(AiProvider provider);
 const char *aiKeyPage(AiProvider provider);
 std::string aiSelectedModel(const OrPreferences &prefs);
@@ -74,9 +105,11 @@ bool validGoogleModel(const std::string &model);
 bool validAiModel(AiProvider provider, const std::string &model);
 AiEndpoint aiEndpoint(AiProvider provider, AiOperation operation,
                       const std::string &model = {},
-                      const std::string &page = {});
+                      const std::string &page = {},
+                      const std::string &endpoint = {});
 std::string aiRequest(AiProvider provider, const std::string &instruction,
-                      const std::string &text, const std::string &model = {});
+                      const std::string &text, const std::string &model = {},
+                      bool stream = false);
 // Extract the actual system/user text from the already serialized request.
 // UI headings are separate and never inserted into the API payload.
 std::pair<std::string, std::string> aiPromptContents(

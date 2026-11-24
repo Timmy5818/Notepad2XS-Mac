@@ -1,6 +1,7 @@
 # Notepad2XS for macOS — 移植計畫
 
-> 來源：`Notepad2XS_R133_Fullscreen_Source.zip`（專家記事本 / NotePad2-XS R133，Windows／Win32／C、C++）
+> 來源：`Notepad2XS_R133_Fullscreen_Source.zip`（專家記事本 / NotePad2-XS R133，Windows／Win32／C、C++）；
+> 2026-11-24 追加 R134～R154（`Notepad2XS_R154_Visual_Studio_2026_Link_Fix_x64`），見第 13 節
 > 目標：在 macOS 上做出功能對等的原生編輯器
 > 建立日期：2026-11-21
 
@@ -304,3 +305,50 @@ SecureEraseCore.h（覆寫／同步／回讀驗證／刪除流程）、JpegComme
 - 開啟檔案時，啟動時自動建立且未修改的空白「未命名」文件會被關閉（與 TextEdit 相同）。
 - CSV 表格模式的視窗改為不超過文件視窗，避免加了分頁列後底部按鈕被裁掉。
 - 驗證：三個檔案合為三個分頁、⌘1／⌘9／⌘2／⌘⇧]／⌘⇧[／⌃Tab／⌃⇧Tab 切換、中鍵關閉非作用中分頁與有修改的分頁（先詢問儲存）、⌘T 與「＋」新增分頁、改為新視窗模式後開檔為獨立視窗、合併所有視窗、單一分頁時分頁列常駐。
+
+## 13. 追加 Windows 版 R134～R154（2026-11-24，v1.2.0）
+
+### 移植項目
+
+| Windows 版 | 內容 | Mac 版做法 |
+|---|---|---|
+| R134 | AI 新增 OpenAI、Claude、Ollama、Azure OpenAI、Groq、Grok；串流顯示、停止、完整接收後預覽、送出範圍（整份／選取／只送指令） | `core/OrCore` 換成 R154 版；`AiUI.mm` 改用 NSURLSession 委派接收串流（`N2AiReceiver`）；服務網址只有 Ollama（本機 HTTP）與 Azure 可設定 |
+| R135 | PNG／WebP 內嵌文字（明文／AES／EXES），與 JPG 相同 | `core/ImageCommentFormat` 原樣沿用；底圖 `PngDefaultArtwork.png`、`WebpDefaultArtwork.webp`；寫入後先讀回驗證 |
+| R136 | 編輯 → 排版模式（HTML） | `core/HtmlLayoutCore` 原樣沿用（解析、安全檢查、合併）；畫布改用 WKWebView＋CSP（不載入外部資源）；WebKit 的 margin 簡寫與 `<p>` 內的清單在擷取時整理成原版允許的寫法 |
+| R136.1 | 新增西班牙文、巴西葡萄牙文、義大利文、波蘭文 | 翻譯表移到 `resources/Localization.json`（317 句 × 11 語）；Windows 版有的字串直接取自其 `.rc` |
+| R137 | 行書籤、標記符合的行、區塊折疊、JSON 格式化／壓縮 | `EditorNavigation.mm`；JSON 用 `core/JsonFormatCore.h`（改成同時支援 UTF-8） |
+| R138～R141 | 雙色書籤、書籤欄、文件旁 `.2xs` 保存書籤與檢視狀態 | `BookmarkStore.mm`，格式與 Windows 版相同（`EX_MD3(檔名).ini`、壓縮檔為「壓縮檔名\|成員路徑」）；檔名先轉成 NFC，兩邊算出同一個名稱 |
+| R139 | JSON 指令搬到「工具 → JSON 處理」 | 同 |
+| R142～R148 | Windows 版自製分頁 | Mac 版已用系統分頁；補上分頁右鍵選單（重新載入、在 Finder 中顯示、在新視窗開啟、關閉其他／全部分頁、全部儲存）、全部儲存（⌥⌘S）、重新開啟時還原分頁 |
+| R149～R150 | 檔案搜尋「內容包含」＋AND／OR／引號 | `FileSearchWindow.mm`：分段讀取（UTF-8、UTF-16、無 BOM 的 UTF-16、Big5、Windows-1252）；位置新增「其他資料夾…」 |
+| R151 | 字元資訊、JSON 語法配置、自動補括號／引號 | 自動補全以 `SCIContentView` 子類別處理鍵盤輸入（輸入法組字中不處理） |
+| R152 | 工作列「工作」選單 | Dock 圖示右鍵選單：新增分頁、檔案搜尋、關閉所有分頁、恢復應用預設值 |
+
+不移植：R144 固定分頁、R145 分頁圖示、R146～R148 分頁外觀（系統分頁不支援）、R142 快捷鍵調整（Mac 用 ⌘ 不衝突）、R153／R154／R136.1 的 Windows 編譯修正。
+
+### 測試
+
+- 單元測試新增：`test_navigation.mm`（JSON 與 Windows 版書籤格式案例＋實際編輯區的 `.2xs` 讀寫，28 項）、`test_filesearch.cpp`、`test_htmllayout.cpp`（Windows 版案例）、`test_image.mm`（PNG／WebP／JPG 寫入後用 ImageIO 比對像素，21 項）。
+- GUI 測試：新增 App 內建的自動操作工具 `tests/uitest/N2UITest.mm`（`UITEST=1 ./build.sh`，建到 `build/uitest/`，bundle id 與設定獨立，不使用鑰匙圈）。不需要「輔助使用」「螢幕錄影」權限。
+- AI 串流以本機模擬的 Ollama 服務測試（模型清單、連線測試、串流、停止、預覽後套用、送出範圍）。
+
+### 測試時找到並修正的問題
+
+- `OrPreferences::activeEndpoint()` 的非 const 版本在固定網址的服務會拋出例外 → 讀取一律用 const 版本。
+- AI 預覽的「套用」區塊保留了結果字串的參考，按下時字串已消失 → 改為複製。
+- 分頁列（NSTabBar）的 hitTest 只回傳分頁列本身 → 改用位置找分頁按鈕（右鍵選單與中鍵關閉都用）。
+- 還原分頁時順序相反 → 每次接在最後一個分頁後面。
+- WebKit 的縮排、清單產生原版不允許的 HTML → 擷取時整理。
+
+### 程式碼審查（2026-11-24）
+
+| 問題 | 修正 |
+|---|---|
+| 串流回答異常結束（截斷、錯誤事件、JSON 錯誤）時，C++ 例外穿過 NSURLSession 委派 → 程式當掉 | 委派中攔下例外、取消連線，回到背景工作再以錯誤訊息顯示 |
+| 串流的原始位元組含大量 JSON 外框，中等長度的答覆就超過 2 MiB 上限 | 串流時原始資料上限放寬，答覆本身仍由 AiStream 限制在 1 MiB |
+| Claude 的 `max_tokens` 只有 4096，較長的改寫一定失敗 | 提高到 8192；答覆因長度被截斷時（max_tokens／length）顯示明確說明 |
+| 排版模式為了編輯而包在行內文字外的 `<p>` 被寫回原始碼 | 畫布的包裝段落加上標記，擷取時移除（使用者自己分出的段落保留） |
+| 檔案搜尋「內容包含」只輸入空白時被當成搜尋空白 | 只有空白或 `*` 時視為不限內容 |
+| PNG／WebP 底圖尚未加入版本控制 | 提交時一併加入 |
+
+驗證：用本機模擬服務送出「長度截斷」與「壞掉的 JSON」串流，都顯示錯誤而不當掉；一般串流照常套用；排版模式修改行內文字與在最後區塊插入表格，原始碼不再多出 `<p>`。

@@ -8,6 +8,7 @@
 #include "OrCore.h"
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 #pragma mark - 設定保存（鑰匙圈；格式沿用 Windows 版 orSavePreferences v4）
 
@@ -38,34 +39,106 @@ static BOOL SavePrefs(NSString **error) {
     return YES;
 }
 
+void N2AiClearApiKeys(void) {
+    xs::OrPreferences &p = Prefs();
+    std::vector<std::string *> keys = {&p.key, &p.googleKey, &p.nvidia.key, &p.deepseek.key};
+    for (auto &service : p.additional) keys.push_back(&service.key);
+    for (std::string *k : keys) {
+        std::fill(k->begin(), k->end(), '\0');
+        k->clear();
+    }
+    SavePrefs(nil);
+}
+
 #pragma mark - HTTP
 
 struct AiCancelled {};
 
-@interface N2NoRedirect : NSObject <NSURLSessionTaskDelegate>
+
+// 接收回應：限制大小、可取消；串流服務（R134 新增的六家）邊收邊解析並回報目前文字
+@interface N2AiReceiver : NSObject <NSURLSessionDataDelegate>
+@property (nonatomic) BOOL streaming;
 @end
-@implementation N2NoRedirect
+@implementation N2AiReceiver {
+@public
+    std::unique_ptr<xs::AiStream> _stream;
+    std::string _body;
+    size_t _received;
+    BOOL _tooLarge;
+    std::string _streamError;   // 串流解析失敗的說明（不能讓 C++ 例外穿過系統的委派呼叫）
+    NSHTTPURLResponse *_response;
+    NSError *_error;
+    dispatch_semaphore_t _done;
+    std::function<void(const std::string &)> _progress;
+    CFAbsoluteTime _lastUpdate;
+}
 - (void)URLSession:(NSURLSession *)s task:(NSURLSessionTask *)t willPerformHTTPRedirection:(NSHTTPURLResponse *)r
         newRequest:(NSURLRequest *)req completionHandler:(void (^)(NSURLRequest *))h { h(nil); }   // 不跟隨重新導向
+- (void)URLSession:(NSURLSession *)s dataTask:(NSURLSessionDataTask *)t didReceiveResponse:(NSURLResponse *)r
+ completionHandler:(void (^)(NSURLSessionResponseDisposition))h {
+    _response = (NSHTTPURLResponse *)r;
+    h(NSURLSessionResponseAllow);
+}
+- (void)URLSession:(NSURLSession *)s dataTask:(NSURLSessionDataTask *)t didReceiveData:(NSData *)data {
+    if (_tooLarge || !_streamError.empty()) return;
+    _received += data.length;
+    BOOL streaming = _stream && _response.statusCode == 200;
+    // 串流的每段都帶有 JSON 外框，原始位元組比答覆大很多：答覆本身由 AiStream 限制在 1 MiB
+    if (_received > (streaming ? 32 * xs::orResponseLimit : xs::orResponseLimit)) { _tooLarge = YES; [t cancel]; return; }
+    if (streaming) {
+        __block bool changed = false;
+        try {
+            [data enumerateByteRangesUsingBlock:^(const void *bytes, NSRange range, BOOL *stop) {
+                changed = self->_stream->feed((const char *)bytes, range.length) || changed;
+            }];
+        } catch (const std::exception &e) {
+            _streamError = e.what();
+            [t cancel];
+            return;
+        } catch (...) {
+            _streamError = u8"AI 串流回答未正常結束，原文未變更。";
+            [t cancel];
+            return;
+        }
+        CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+        if (changed && _progress && now - _lastUpdate >= 0.08) { _progress(_stream->text()); _lastUpdate = now; }
+    } else {
+        _body.append((const char *)data.bytes, data.length);
+    }
+}
+- (void)URLSession:(NSURLSession *)s task:(NSURLSessionTask *)t didCompleteWithError:(NSError *)error {
+    _error = error;
+    dispatch_semaphore_signal(_done);
+}
 @end
 
-// 與 Windows 版 aiHttp 相同：固定主機與路徑、HTTPS、120 秒、不跟隨轉址、不用 Cookie、回應上限 2 MiB
+// 與 Windows 版 aiHttp 相同：固定主機與路徑、HTTPS（本機 Ollama 只用 127.0.0.1 的 HTTP）、120 秒、不跟隨轉址、
+// 不用 Cookie、回應上限 2 MiB；progress 不為空時以串流接收（只有新服務）
 static std::pair<unsigned, std::string> AiHttp(xs::AiProvider provider, const std::string &key, const std::string &body,
                                                xs::AiOperation op, const std::string &model, const std::string &page,
-                                               std::shared_ptr<std::atomic<bool>> cancel) {
-    if (!xs::validOrKey(key)) throw std::runtime_error(u8"請先在「人工智慧連接設定」輸入有效的 API Key。");
-    xs::AiEndpoint ep = xs::aiEndpoint(provider, op, model, page);
-    NSURL *url = [NSURL URLWithString:N2FromUTF8("https://" + ep.host + ep.path)];
+                                               std::shared_ptr<std::atomic<bool>> cancel, const std::string &endpoint = {},
+                                               std::function<void(const std::string &)> progress = nullptr) {
+    if (xs::aiRequiresKey(provider) && !xs::validOrKey(key)) throw std::runtime_error(u8"請先在「人工智慧連接設定」輸入有效的 API Key。");
+    xs::AiEndpoint ep = xs::aiEndpoint(provider, op, model, page, endpoint);
+    std::string origin = (ep.secure ? "https://" : "http://") + ep.host;
+    if (!ep.secure || ep.port != 443) origin += ":" + std::to_string(ep.port);
+    NSURL *url = [NSURL URLWithString:N2FromUTF8(origin + ep.path)];
     if (!url) throw std::runtime_error(u8"服務位址不正確。");
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                                    timeoutInterval:120];
     req.HTTPMethod = N2FromUTF8(ep.method);
     req.HTTPShouldHandleCookies = NO;
     if (!body.empty()) req.HTTPBody = [NSData dataWithBytes:body.data() length:body.size()];
-    if (provider == xs::AiProvider::google) [req setValue:N2FromUTF8(key) forHTTPHeaderField:@"x-goog-api-key"];
-    else [req setValue:[@"Bearer " stringByAppendingString:N2FromUTF8(key)] forHTTPHeaderField:@"Authorization"];
+    if (xs::aiRequiresKey(provider)) {
+        NSString *k = N2FromUTF8(key);
+        if (provider == xs::AiProvider::google) [req setValue:k forHTTPHeaderField:@"x-goog-api-key"];
+        else if (provider == xs::AiProvider::claude) [req setValue:k forHTTPHeaderField:@"x-api-key"];
+        else if (provider == xs::AiProvider::azure) [req setValue:k forHTTPHeaderField:@"api-key"];
+        else [req setValue:[@"Bearer " stringByAppendingString:k] forHTTPHeaderField:@"Authorization"];
+    }
+    if (provider == xs::AiProvider::claude) [req setValue:@"2023-06-01" forHTTPHeaderField:@"anthropic-version"];
     [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [req setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    [req setValue:progress ? @"text/event-stream, application/x-ndjson" : @"application/json" forHTTPHeaderField:@"Accept"];
     if (provider == xs::AiProvider::openRouter) {
         [req setValue:@"https://dz.jplopsoft.idv.tw/" forHTTPHeaderField:@"HTTP-Referer"];
         [req setValue:@"notepad2xs" forHTTPHeaderField:@"X-Title"];
@@ -75,27 +148,27 @@ static std::pair<unsigned, std::string> AiHttp(xs::AiProvider provider, const st
     cfg.timeoutIntervalForResource = 120;
     cfg.HTTPCookieStorage = nil;
     cfg.URLCache = nil;
-    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg delegate:[N2NoRedirect new] delegateQueue:nil];
-    __block NSData *data = nil;
-    __block NSHTTPURLResponse *resp = nil;
-    __block NSError *err = nil;
-    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-    NSURLSessionDataTask *task = [session dataTaskWithRequest:req completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
-        data = d; resp = (NSHTTPURLResponse *)r; err = e;
-        dispatch_semaphore_signal(sem);
-    }];
+    if (!ep.secure) cfg.connectionProxyDictionary = @{};   // 本機服務不經過 Proxy
+    N2AiReceiver *rx = [N2AiReceiver new];
+    rx->_done = dispatch_semaphore_create(0);
+    if (progress) { rx->_stream = std::make_unique<xs::AiStream>(provider); rx->_progress = progress; }
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg delegate:rx delegateQueue:nil];
+    NSURLSessionDataTask *task = [session dataTaskWithRequest:req];
     [task resume];
-    while (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC)) != 0) {
+    while (dispatch_semaphore_wait(rx->_done, dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC)) != 0) {
         if (cancel && *cancel) [task cancel];
     }
     [session finishTasksAndInvalidate];
     if (cancel && *cancel) throw AiCancelled{};
-    if (err) {
-        if (err.code == NSURLErrorTimedOut) throw std::runtime_error(u8"人工智慧請求超過 120 秒，原文未變更。");
-        throw std::runtime_error(std::string(u8"無法連線到 ") + xs::aiProviderName(provider) + u8"：" + N2ToUTF8(err.localizedDescription));
+    if (!rx->_streamError.empty()) throw std::runtime_error(rx->_streamError);
+    if (rx->_tooLarge) throw std::runtime_error(u8"人工智慧回應超過 2 MiB，原文未變更。");
+    if (rx->_error) {
+        if (rx->_error.code == NSURLErrorTimedOut) throw std::runtime_error(u8"人工智慧請求超過 120 秒，原文未變更。");
+        throw std::runtime_error(std::string(u8"無法連線到 ") + xs::aiProviderName(provider) + u8"：" + N2ToUTF8(rx->_error.localizedDescription));
     }
-    if (data.length > xs::orResponseLimit) throw std::runtime_error(u8"人工智慧回應超過 2 MiB，原文未變更。");
-    return {(unsigned)resp.statusCode, std::string((const char *)data.bytes, data.length)};
+    unsigned status = (unsigned)rx->_response.statusCode;
+    if (rx->_stream && status == 200) return {status, rx->_stream->finish()};
+    return {status, rx->_body};
 }
 
 #pragma mark - 進度（可取消）
@@ -163,8 +236,9 @@ static void Alert(NSWindow *w, NSString *msg, NSString *info) {
 static NSString *OutputName(xs::AiOutputMode m) { return N2FromUTF8(xs::aiOutputName(m)); }
 static const xs::AiOutputMode kOutputs[] = {xs::AiOutputMode::replace, xs::AiOutputMode::insertBelow,
                                             xs::AiOutputMode::newWindow, xs::AiOutputMode::displayOnly};
-static const xs::AiProvider kProviders[] = {xs::AiProvider::openRouter, xs::AiProvider::google,
-                                            xs::AiProvider::nvidia, xs::AiProvider::deepseek};
+static const int kProviderCount = (int)xs::AiProvider::count;
+// 讀取服務網址：一定要用 const 版本（非 const 版本在固定網址的服務會拋出例外，只能用來寫入）
+static std::string Endpoint(const xs::OrPreferences &p) { return p.activeEndpoint(); }   // 10 家：原有 4 家＋R134 新增 6 家
 
 static NSScrollView *TextArea(NSRect r, NSTextView **out, BOOL editable) {
     NSScrollView *sv = [[NSScrollView alloc] initWithFrame:r];
@@ -183,6 +257,69 @@ static NSScrollView *TextArea(NSRect r, NSTextView **out, BOOL editable) {
     sv.documentView = tv;
     *out = tv;
     return sv;
+}
+
+// 串流顯示（R134 新服務）：處理視窗即時更新收到的文字，「停止」中斷
+static void RunAiStreamJob(NSWindow *parent, NSString *title,
+                           std::string (^work)(std::shared_ptr<std::atomic<bool>>, std::function<void(const std::string &)>),
+                           void (^done)(BOOL ok, const std::string &result, NSString *error)) {
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 560, 340)
+                                                styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable
+                                                  backing:NSBackingStoreBuffered defer:YES];
+    NSView *v = panel.contentView;
+    NSProgressIndicator *spin = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(16, 306, 18, 18)];
+    spin.style = NSProgressIndicatorStyleSpinning;
+    spin.controlSize = NSControlSizeSmall;
+    spin.autoresizingMask = NSViewMinYMargin;
+    [spin startAnimation:nil];
+    NSTextField *label = [NSTextField labelWithString:title];
+    label.frame = NSMakeRect(40, 306, 500, 18);
+    label.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
+    NSTextView *tv = nil;
+    NSScrollView *sv = TextArea(NSMakeRect(16, 56, 528, 242), &tv, NO);
+    sv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    NSButton *stop = [NSButton buttonWithTitle:@"停止" target:nil action:nil];
+    stop.frame = NSMakeRect(448, 12, 96, 32);
+    stop.autoresizingMask = NSViewMinXMargin;
+    stop.keyEquivalent = @"\033";
+    [N2BlockTarget attach:stop block:^(id sender) {
+        *cancel = true;
+        label.stringValue = @"正在停止…";
+    }];
+    for (NSView *x in @[spin, label, sv, stop]) [v addSubview:x];
+    [parent beginSheet:panel completionHandler:nil];
+    // 背景收到新文字時只記下最新內容，由主執行緒定時顯示
+    auto latest = std::make_shared<std::string>();
+    auto lock = std::make_shared<std::mutex>();
+    auto shown = std::make_shared<size_t>(0);
+    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer *t) {
+        std::string text;
+        { std::lock_guard<std::mutex> g(*lock); if (latest->size() == *shown) return; text = *latest; }
+        *shown = text.size();
+        tv.string = N2FromUTF8(xs::orNormalizeEol(text, SC_EOL_LF)) ?: @"";
+        [tv scrollToEndOfDocument:nil];
+    }];
+    [NSRunLoop.mainRunLoop addTimer:timer forMode:NSModalPanelRunLoopMode];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        std::string result;
+        NSString *error = nil;
+        BOOL ok = NO;
+        try {
+            result = work(cancel, [latest, lock](const std::string &text) { std::lock_guard<std::mutex> g(*lock); *latest = text; });
+            ok = YES;
+        }
+        catch (const AiCancelled &) { error = nil; }
+        catch (const std::exception &e) { error = ErrText(e); }
+        catch (...) { error = @"發生未知錯誤，原文未變更。"; }
+        BOOL cancelled = *cancel;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [timer invalidate];
+            [parent endSheet:panel];
+            if (cancelled) done(NO, std::string(), nil);   // 停止：不套用、不提示
+            else done(ok, result, error);
+        });
+    });
 }
 
 #pragma mark - 結果顯示視窗
@@ -219,14 +356,70 @@ static void ShowResult(NSWindow *parent, const std::string &answer, NSString *no
     [parent beginSheet:p completionHandler:nil];
 }
 
+// 完整接收後的預覽：可拷貝，或按「（結果處理方式）」套用
+static void ReviewResult(NSWindow *parent, const std::string &answer, NSString *action, void (^apply)(void)) {
+    NSPanel *p = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 620, 440)
+                                            styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable
+                                              backing:NSBackingStoreBuffered defer:YES];
+    NSView *v = p.contentView;
+    NSTextField *title = [NSTextField labelWithString:[NSString stringWithFormat:@"AI 結果預覽：確認後「%@」", action]];
+    title.frame = NSMakeRect(16, 404, 588, 20);
+    title.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+    [v addSubview:title];
+    NSTextView *tv = nil;
+    NSScrollView *sv = TextArea(NSMakeRect(16, 56, 588, 340), &tv, NO);
+    sv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    tv.string = N2FromUTF8(xs::orNormalizeEol(answer, SC_EOL_LF)) ?: @"";
+    tv.selectable = YES;
+    [v addSubview:sv];
+    NSButton *copy = [NSButton buttonWithTitle:@"全部拷貝" target:nil action:nil];
+    copy.frame = NSMakeRect(16, 12, 110, 32);
+    NSButton *cancel = [NSButton buttonWithTitle:@"取消" target:nil action:nil];
+    cancel.frame = NSMakeRect(372, 12, 100, 32);
+    cancel.keyEquivalent = @"\033";
+    cancel.autoresizingMask = NSViewMinXMargin;
+    NSButton *ok = [NSButton buttonWithTitle:action target:nil action:nil];
+    ok.frame = NSMakeRect(476, 12, 128, 32);
+    ok.keyEquivalent = @"\r";
+    ok.autoresizingMask = NSViewMinXMargin;
+    for (NSView *x in @[copy, cancel, ok]) [v addSubview:x];
+    NSString *text = tv.string;
+    [N2BlockTarget attach:copy block:^(id sender) {
+        [NSPasteboard.generalPasteboard clearContents];
+        [NSPasteboard.generalPasteboard setString:text forType:NSPasteboardTypeString];
+    }];
+    [N2BlockTarget attach:cancel block:^(NSButton *sender) { [sender.window.sheetParent endSheet:sender.window]; }];
+    void (^applyCopy)(void) = [apply copy];
+    [N2BlockTarget attach:ok block:^(NSButton *sender) {
+        [sender.window.sheetParent endSheet:sender.window];
+        dispatch_async(dispatch_get_main_queue(), applyCopy);
+    }];
+    [parent beginSheet:p completionHandler:nil];
+}
+
 #pragma mark - 套用結果
 
 struct AiSnapshot {
     std::string bytes;     // 整份文件（UTF-8）
     std::string text;      // 要處理的文字
     long start = 0, end = 0;
+    long selStart = 0, selEnd = 0, caret = 0;
     int eol = SC_EOL_LF;
 };
+
+// 送出範圍（R134）：整份文件、選取文字、只送出指令（結果插入在原游標位置）
+enum { N2AiScopeDocument = 0, N2AiScopeSelection = 1, N2AiScopeInstruction = 2 };
+
+// 依範圍設定要處理的文字與寫回位置；不合限制時回傳錯誤說明
+static NSString *ApplyScope(AiSnapshot &s, int scope) {
+    if (scope == N2AiScopeInstruction) { s.start = s.end = s.caret; s.text.clear(); return nil; }
+    if (scope == N2AiScopeSelection) { s.start = s.selStart; s.end = s.selEnd; }
+    else { s.start = 0; s.end = (long)s.bytes.size(); }
+    s.text = s.bytes.substr((size_t)s.start, (size_t)(s.end - s.start));
+    if (s.text.size() > xs::orInputLimit) return @"待處理文字超過 128 KiB，請縮小選取範圍。";
+    if (s.text.find('\0') != std::string::npos) return @"待處理文字包含 NUL 或超過 128 KiB。";
+    return nil;
+}
 
 static void OpenAnswerFile(const std::string &answer, NSWindow *parent) {
     NSString *path = [N2LogsDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_ai_log.txt", NSUUID.UUID.UUIDString]];
@@ -281,11 +474,12 @@ static void ApplyAnswer(EditorWindowController *ed, const AiSnapshot &s, xs::AiO
     __weak EditorWindowController *_editor;
     AiSnapshot _snap;
     NSTextView *_prompt, *_preview;
-    NSPopUpButton *_history, *_templates, *_output;
+    NSPopUpButton *_history, *_templates, *_output, *_scope;
     NSButton *_run;
     NSTextField *_service;
     xs::AiOutputMode _mode;
     NSInteger _templateIndex;   // -1 = 自訂
+    NSString *_scopeError;
 }
 
 static NSMutableSet *gPromptWindows;
@@ -337,9 +531,24 @@ static NSMutableSet *gPromptWindows;
     for (NSPopUpButton *p in @[_history, _templates, _output]) [v addSubview:p];
 
     NSTextField *pv = [NSTextField labelWithString:@"實際送出的內容（預覽）："];
-    pv.frame = NSMakeRect(16, 354, 400, 18);
+    pv.frame = NSMakeRect(16, 354, 300, 18);
     pv.autoresizingMask = NSViewMinYMargin;
     [v addSubview:pv];
+    // 送出範圍：有選取時預設「選取文字」，沒有選取時預設「整份文件」
+    NSTextField *sl = [NSTextField labelWithString:@"送出："];
+    sl.frame = NSMakeRect(420, 354, 50, 18);
+    sl.alignment = NSTextAlignmentRight;
+    sl.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+    [v addSubview:sl];
+    _scope = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(472, 348, 216, 26) pullsDown:NO];
+    _scope.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+    BOOL hasSelection = _snap.selEnd > _snap.selStart;
+    [_scope addItemWithTitle:@"整份文件"]; _scope.lastItem.tag = N2AiScopeDocument;
+    if (hasSelection) { [_scope addItemWithTitle:@"選取文字"]; _scope.lastItem.tag = N2AiScopeSelection; }
+    [_scope addItemWithTitle:@"只送出指令"]; _scope.lastItem.tag = N2AiScopeInstruction;
+    [_scope selectItemWithTag:hasSelection ? N2AiScopeSelection : N2AiScopeDocument];
+    _scope.target = self; _scope.action = @selector(scopeChanged:);
+    [v addSubview:_scope];
     NSTextView *previewView = nil;
     NSScrollView *vs = TextArea(NSMakeRect(16, 52, 670, 298), &previewView, NO);
     _preview = previewView;
@@ -416,6 +625,8 @@ static NSMutableSet *gPromptWindows;
     [self updatePreview];
 }
 
+- (void)scopeChanged:(id)sender { [self updatePreview]; }
+
 - (void)textDidChange:(NSNotification *)n {
     if (_templateIndex >= 0) { _templateIndex = -1; [self rebuildMenus]; }
     [self updatePreview];
@@ -423,8 +634,16 @@ static NSMutableSet *gPromptWindows;
 
 - (void)updatePreview {
     xs::OrPreferences &p = Prefs();
+    _scopeError = ApplyScope(_snap, (int)_scope.selectedTag);
+    if (_scopeError) {
+        _preview.string = _scopeError;
+        _preview.textColor = NSColor.systemRedColor;
+        _run.enabled = NO;
+        return;
+    }
     try {
-        std::string req = xs::aiRequest(p.provider, N2ToUTF8(_prompt.string), _snap.text, xs::aiSelectedModel(p));
+        std::string req = xs::aiRequest(p.provider, N2ToUTF8(_prompt.string), _snap.text, xs::aiSelectedModel(p),
+                                        xs::aiIsNewProvider(p.provider));
         auto contents = xs::aiPromptContents(p.provider, req);
         _preview.string = [NSString stringWithFormat:@"【系統指令（system）】\n%@\n\n【使用者內容（user）】\n%@",
                            N2FromUTF8(contents.first), N2FromUTF8(contents.second)];
@@ -486,18 +705,33 @@ static NSMutableSet *gPromptWindows;
     EditorWindowController *ed = _editor;
     xs::OrPreferences &p = Prefs();
     std::string instruction = N2ToUTF8(_prompt.string), request;
-    try { request = xs::aiRequest(p.provider, instruction, _snap.text, xs::aiSelectedModel(p)); }
+    BOOL streaming = xs::aiIsNewProvider(p.provider);
+    try { request = xs::aiRequest(p.provider, instruction, _snap.text, xs::aiSelectedModel(p), streaming); }
     catch (const std::exception &e) { Alert(self.window, ErrText(e), nil); return; }
     xs::orRemember(p, instruction);
     NSString *err = nil;
     if (!SavePrefs(&err)) NSLog(@"AI 歷史保存失敗：%@", err);
     xs::AiProvider provider = p.provider;
-    std::string key = p.activeKey(), model = xs::aiSelectedModel(p);
+    std::string key = p.activeKey(), model = xs::aiSelectedModel(p), endpoint = Endpoint(p);
     AiSnapshot snap = _snap;
     xs::AiOutputMode mode = _mode;
     [self finish];
     if (!ed) return;
     NSString *title = [NSString stringWithFormat:@"%@ 處理中…", N2FromUTF8(xs::aiProviderName(provider))];
+    if (streaming) {
+        // 新服務：邊收邊顯示，可按「停止」；完整接收後先預覽，再確認套用
+        RunAiStreamJob(ed.window, title, ^std::string(std::shared_ptr<std::atomic<bool>> cancel, std::function<void(const std::string &)> progress) {
+            auto reply = AiHttp(provider, key, request, xs::AiOperation::generate, model, {}, cancel, endpoint, progress);
+            if (reply.first == 200) return reply.second;
+            return xs::aiAnswer(provider, reply.first, reply.second);   // 錯誤狀態：取得服務的錯誤說明
+        }, ^(BOOL ok, const std::string &answer, NSString *error) {
+            if (!ok) { if (error) Alert(ed.window, @"人工智慧處理失敗。", error); return; }
+            if (mode == xs::AiOutputMode::displayOnly) { ShowResult(ed.window, answer, nil); return; }
+            std::string result = answer;   // 區塊會在稍後執行：複製一份（不能保留參數的參考）
+            ReviewResult(ed.window, result, OutputName(mode), ^{ ApplyAnswer(ed, snap, mode, result); });
+        });
+        return;
+    }
     RunAiJob(ed.window, title, ^std::string(std::shared_ptr<std::atomic<bool>> cancel) {
         auto reply = AiHttp(provider, key, request, xs::AiOperation::generate, model, {}, cancel);
         return xs::aiAnswer(provider, reply.first, reply.second);
@@ -517,13 +751,12 @@ void N2AiRunForEditor(EditorWindowController *ed) {
     AiSnapshot s;
     NSData *all = ed.textAsUTF8;
     s.bytes.assign((const char *)all.bytes, all.length);
-    s.start = [ed send:SCI_GETSELECTIONSTART];
-    s.end = [ed send:SCI_GETSELECTIONEND];
-    if (s.start == s.end) { s.start = 0; s.end = (long)s.bytes.size(); }
-    s.text = s.bytes.substr((size_t)s.start, (size_t)(s.end - s.start));
+    s.selStart = [ed send:SCI_GETSELECTIONSTART];
+    s.selEnd = [ed send:SCI_GETSELECTIONEND];
+    s.caret = [ed send:SCI_GETCURRENTPOS];
     s.eol = (int)[ed send:SCI_GETEOLMODE];
-    if (s.text.size() > xs::orInputLimit || s.text.find('\0') != std::string::npos) {
-        Alert(ed.window, @"待處理文字包含 NUL 或超過 128 KiB，請縮小選取範圍。", nil);
+    if (!xs::aiConnectionReady(Prefs())) {
+        Alert(ed.window, @"請先在「工具 → 人工智慧 → 連接設定」完成所選服務的連接設定。", nil);
         return;
     }
     N2AiPromptWindow *w = [[N2AiPromptWindow alloc] initWithEditor:ed snapshot:s];
@@ -539,10 +772,11 @@ void N2AiRunForEditor(EditorWindowController *ed) {
     xs::OrPreferences _draft;
     NSPopUpButton *_provider, *_model;
     NSSecureTextField *_key;
+    NSTextField *_endpoint, *_endpointLabel, *_modelText, *_modelTextLabel, *_modelLabel, *_note;
     NSButton *_refresh, *_test, *_keyPage;
     NSTextField *_status;
     NSProgressIndicator *_spin;
-    BOOL _busy;
+    BOOL _busy, _rendering;
 }
 
 + (void)show {
@@ -554,7 +788,7 @@ void N2AiRunForEditor(EditorWindowController *ed) {
 }
 
 - (instancetype)init {
-    NSWindow *win = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 560, 300)
+    NSWindow *win = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 560, 392)
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:YES];
     win.title = @"人工智慧連接設定";
     if ((self = [super initWithWindow:win])) { [self build]; [win center]; }
@@ -565,45 +799,68 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
 
 - (void)build {
     NSView *v = self.window.contentView;
-    [v addSubview:L(@"服務：", NSMakeRect(10, 252, 90, 20))];
-    _provider = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(104, 247, 260, 26) pullsDown:NO];
-    for (auto pv : kProviders) [_provider addItemWithTitle:N2FromUTF8(xs::aiProviderName(pv))];
+    [v addSubview:L(@"服務：", NSMakeRect(10, 344, 110, 20))];
+    _provider = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(124, 339, 250, 26) pullsDown:NO];
+    for (int i = 0; i < kProviderCount; i++) [_provider addItemWithTitle:N2FromUTF8(xs::aiProviderName((xs::AiProvider)i))];
     _provider.target = self; _provider.action = @selector(providerChanged:);
     [v addSubview:_provider];
     _keyPage = [NSButton buttonWithTitle:@"申請 TOKEN KEY" target:self action:@selector(openKeyPage:)];
-    _keyPage.frame = NSMakeRect(370, 244, 170, 32);
+    _keyPage.frame = NSMakeRect(380, 336, 164, 32);
     [v addSubview:_keyPage];
 
-    [v addSubview:L(@"API Key：", NSMakeRect(10, 212, 90, 20))];
-    _key = [[NSSecureTextField alloc] initWithFrame:NSMakeRect(106, 208, 434, 24)];
+    // 服務網址（Ollama、Azure OpenAI）
+    _endpointLabel = L(@"服務網址：", NSMakeRect(10, 304, 110, 20));
+    [v addSubview:_endpointLabel];
+    _endpoint = [[NSTextField alloc] initWithFrame:NSMakeRect(126, 300, 414, 24)];
+    _endpoint.usesSingleLineMode = YES;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(fieldEdited:) name:NSControlTextDidChangeNotification object:_endpoint];
+    [v addSubview:_endpoint];
+
+    [v addSubview:L(@"API Key：", NSMakeRect(10, 264, 110, 20))];
+    _key = [[NSSecureTextField alloc] initWithFrame:NSMakeRect(126, 260, 414, 24)];
     _key.target = self; _key.action = @selector(keyChanged:);
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyEdited:) name:NSControlTextDidChangeNotification object:_key];
     [v addSubview:_key];
 
-    [v addSubview:L(@"模型：", NSMakeRect(10, 172, 90, 20))];
-    _model = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(104, 167, 300, 26) pullsDown:NO];
+    _modelLabel = L(@"模型清單：", NSMakeRect(10, 224, 110, 20));
+    [v addSubview:_modelLabel];
+    _model = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(124, 219, 280, 26) pullsDown:NO];
     _model.target = self; _model.action = @selector(modelChanged:);
     [v addSubview:_model];
     _refresh = [NSButton buttonWithTitle:@"重新取得模型清單" target:self action:@selector(refreshModels:)];
-    _refresh.frame = NSMakeRect(404, 164, 140, 32);
+    _refresh.frame = NSMakeRect(404, 216, 144, 32);
     [v addSubview:_refresh];
 
+    // 新服務：可手動輸入模型 ID（Azure 為部署名稱）
+    _modelTextLabel = L(@"模型 ID：", NSMakeRect(10, 184, 110, 20));
+    [v addSubview:_modelTextLabel];
+    _modelText = [[NSTextField alloc] initWithFrame:NSMakeRect(126, 180, 414, 24)];
+    _modelText.usesSingleLineMode = YES;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(fieldEdited:) name:NSControlTextDidChangeNotification object:_modelText];
+    [v addSubview:_modelText];
+
+    _note = [NSTextField wrappingLabelWithString:@""];
+    _note.frame = NSMakeRect(126, 140, 414, 34);
+    _note.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize];
+    _note.textColor = NSColor.secondaryLabelColor;
+    [v addSubview:_note];
+
     _test = [NSButton buttonWithTitle:@"測試連線" target:self action:@selector(test:)];
-    _test.frame = NSMakeRect(100, 124, 120, 32);
+    _test.frame = NSMakeRect(120, 100, 120, 32);
     [v addSubview:_test];
-    _spin = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(228, 132, 16, 16)];
+    _spin = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(248, 108, 16, 16)];
     _spin.style = NSProgressIndicatorStyleSpinning; _spin.displayedWhenStopped = NO;
     [v addSubview:_spin];
     _status = [NSTextField wrappingLabelWithString:@""];
-    _status.frame = NSMakeRect(106, 64, 434, 56);
+    _status.frame = NSMakeRect(126, 52, 414, 46);
     _status.textColor = NSColor.secondaryLabelColor;
     [v addSubview:_status];
 
     NSButton *cancel = [NSButton buttonWithTitle:@"取消" target:self action:@selector(close)];
-    cancel.frame = NSMakeRect(344, 14, 96, 32);
+    cancel.frame = NSMakeRect(344, 12, 96, 32);
     cancel.keyEquivalent = @"\033";
     NSButton *ok = [NSButton buttonWithTitle:@"確定" target:self action:@selector(save:)];
-    ok.frame = NSMakeRect(444, 14, 96, 32);
+    ok.frame = NSMakeRect(444, 12, 96, 32);
     ok.keyEquivalent = @"\r";
     [v addSubview:cancel]; [v addSubview:ok];
 }
@@ -617,14 +874,35 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
 }
 
 - (void)showDraft {
-    for (int i = 0; i < 4; i++) if (kProviders[i] == _draft.provider) [_provider selectItemAtIndex:i];
+    _rendering = YES;
+    xs::AiProvider pv = _draft.provider;
+    BOOL manual = xs::aiIsNewProvider(pv), needsKey = xs::aiRequiresKey(pv), usesEndpoint = xs::aiUsesEndpoint(pv);
+    BOOL azure = pv == xs::AiProvider::azure, ollama = pv == xs::AiProvider::ollama;
+    [_provider selectItemAtIndex:(NSInteger)pv];
     _key.stringValue = N2FromUTF8(_draft.activeKey());
+    _key.enabled = needsKey && !_busy;
+    _key.placeholderString = needsKey ? @"" : @"本機 Ollama 不需要 API Key";
+    _endpoint.hidden = _endpointLabel.hidden = !usesEndpoint;
+    _endpointLabel.stringValue = azure ? @"Azure Endpoint：" : @"Ollama 服務網址：";
+    _endpoint.placeholderString = azure ? @"https://<資源>.openai.azure.com" : @"http://127.0.0.1:11434";
+    if (usesEndpoint && ![_endpoint.stringValue isEqualToString:N2FromUTF8(Endpoint(_draft))])
+        _endpoint.stringValue = N2FromUTF8(Endpoint(_draft));
+    _modelText.hidden = _modelTextLabel.hidden = !manual;
+    _modelTextLabel.stringValue = azure ? @"部署名稱：" : @"模型 ID：";
+    if (manual && ![_modelText.stringValue isEqualToString:N2FromUTF8(_draft.activeModel())])
+        _modelText.stringValue = N2FromUTF8(_draft.activeModel());
+    _model.hidden = _modelLabel.hidden = _refresh.hidden = azure;
+    _keyPage.title = azure ? @"開啟 Azure" : ollama ? @"下載 Ollama" : @"申請 TOKEN KEY";
+    _note.stringValue = azure ? @"輸入 Azure 資源網址及部署名稱。請選用支援 v1 Chat Completions 文字輸出的部署。"
+                      : ollama ? @"網址留空使用 http://127.0.0.1:11434。請先啟動 Ollama 並安裝模型；只連到本機。"
+                      : manual ? @"可手動輸入模型 ID，或從清單選擇。測試連線會請模型生成一小段文字，可能使用 API 額度。"
+                      : @"";
     [_model removeAllItems];
-    BOOL fixed = _draft.provider == xs::AiProvider::openRouter;
+    BOOL fixed = pv == xs::AiProvider::openRouter;
     if (fixed) {
         [_model addItemWithTitle:@"openrouter/free（固定）"];
     } else {
-        [_model addItemWithTitle:@"（請選擇模型）"];
+        [_model addItemWithTitle:manual ? @"（從清單選擇）" : @"（請選擇模型）"];
         for (auto &m : _draft.activeModels()) {
             NSString *title = m.label.empty() || m.label == m.id ? N2FromUTF8(m.id) : [NSString stringWithFormat:@"%@（%@）", N2FromUTF8(m.label), N2FromUTF8(m.id)];
             [_model addItemWithTitle:title];
@@ -634,32 +912,55 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
         for (NSMenuItem *it in _model.itemArray) if ([it.representedObject isEqual:cur]) [_model selectItem:it];
     }
     _model.enabled = !fixed && !_busy;
-    _refresh.enabled = !fixed && !_busy;
+    _refresh.enabled = xs::aiListsModels(pv) && !_busy;
     _test.enabled = !_busy;
     _provider.enabled = !_busy;
+    _endpoint.enabled = _modelText.enabled = !_busy;
+    _rendering = NO;
 }
 
 - (void)providerChanged:(id)sender {
-    _draft.provider = kProviders[_provider.indexOfSelectedItem];
+    [self syncFields];
+    _draft.provider = (xs::AiProvider)_provider.indexOfSelectedItem;
     _status.stringValue = @"";
+    _endpoint.stringValue = @"";
+    _modelText.stringValue = @"";
     [self showDraft];
 }
 
-// 修改金鑰會清除該服務的模型清單與選擇（不影響其他服務）
+// 新服務：把網址與手動模型 ID 寫回草稿；網址改變時清除模型清單
+- (void)syncFields {
+    if (_rendering || !xs::aiIsNewProvider(_draft.provider)) return;
+    if (xs::aiUsesEndpoint(_draft.provider)) {
+        std::string ep = N2ToUTF8(_endpoint.stringValue);
+        if (ep != Endpoint(_draft)) { _draft.activeEndpoint() = ep; _draft.activeModels().clear(); }
+    }
+    _draft.activeModel() = N2ToUTF8(_modelText.stringValue);
+}
+
+- (void)fieldEdited:(NSNotification *)n { [self syncFields]; }
+
+// 修改金鑰會清除該服務的模型清單與選擇（不影響其他服務；新服務保留手動輸入的模型 ID）
 - (void)keyEdited:(NSNotification *)n { [self keyChanged:nil]; }
 - (void)keyChanged:(id)sender {
+    [self syncFields];
+    if (!xs::aiRequiresKey(_draft.provider)) return;
     std::string k = N2ToUTF8(_key.stringValue);
     if (k == _draft.activeKey()) return;
     _draft.activeKey() = k;
     if (_draft.provider != xs::AiProvider::openRouter) {
         _draft.activeModels().clear();
-        _draft.activeModel().clear();
+        if (!xs::aiIsNewProvider(_draft.provider)) _draft.activeModel().clear();
         [self showDraft];
     }
 }
 
 - (void)modelChanged:(id)sender {
     NSString *m = _model.selectedItem.representedObject;
+    if (xs::aiIsNewProvider(_draft.provider)) {
+        if (m) { _modelText.stringValue = m; [self syncFields]; }
+        return;
+    }
     _draft.activeModel() = N2ToUTF8(m ?: @"");
 }
 
@@ -676,17 +977,25 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
     [self showDraft];
 }
 
+- (BOOL)checkEndpoint {
+    if (xs::aiValidEndpoint(_draft.provider, Endpoint(_draft))) return YES;
+    _status.stringValue = @"請輸入有效的 AI 服務網址。";
+    _status.textColor = NSColor.systemRedColor;
+    return NO;
+}
+
 - (void)refreshModels:(id)sender {
     [self keyChanged:nil];
+    if (![self checkEndpoint]) return;
     xs::AiProvider provider = _draft.provider;
-    std::string key = _draft.activeKey();
+    std::string key = _draft.activeKey(), endpoint = Endpoint(_draft);
     [self setBusy:YES status:@"正在取得模型清單…"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         std::vector<xs::AiModel> models;
         NSString *err = nil;
         try {
             models = xs::aiModels(provider, [&](const std::string &page) {
-                return AiHttp(provider, key, {}, xs::AiOperation::listModels, {}, page, nullptr);
+                return AiHttp(provider, key, {}, xs::AiOperation::listModels, {}, page, nullptr, endpoint);
             });
         } catch (const std::exception &e) { err = ErrText(e); }
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -695,7 +1004,8 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
                 self->_draft.activeModels() = models;
                 bool exists = false;
                 for (auto &m : models) if (m.id == keep) exists = true;
-                if (!exists) self->_draft.activeModel().clear();   // 已不存在的選擇清空；首次不自動選第一筆
+                // 已不存在的選擇清空（新服務保留手動輸入的模型 ID）；首次不自動選第一筆
+                if (!exists && !xs::aiIsNewProvider(provider)) self->_draft.activeModel().clear();
             }
             [self setBusy:NO status:err ?: [NSString stringWithFormat:@"模型清單已更新（%lu 筆），請選擇模型後測試連線或按確定。", (unsigned long)models.size()]];
             if (err) self->_status.textColor = NSColor.systemRedColor;
@@ -705,10 +1015,11 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
 
 - (void)test:(id)sender {
     [self keyChanged:nil];
+    if (![self checkEndpoint]) return;
     xs::AiProvider provider = _draft.provider;
-    std::string key = _draft.activeKey(), model = xs::aiSelectedModel(_draft);
+    std::string key = _draft.activeKey(), model = xs::aiSelectedModel(_draft), endpoint = Endpoint(_draft);
     if (provider != xs::AiProvider::openRouter && !xs::validAiModel(provider, model)) {
-        _status.stringValue = @"請先取得所選服務的模型清單，並選擇要測試的模型。";
+        _status.stringValue = xs::aiIsNewProvider(provider) ? @"請選擇或輸入要測試的模型。" : @"請先取得所選服務的模型清單，並選擇要測試的模型。";
         _status.textColor = NSColor.systemRedColor;
         return;
     }
@@ -721,7 +1032,7 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
                 xs::orCheckKey(r.first, r.second);
             } else {
                 std::string req = xs::aiRequest(provider, u8"請只回覆 OK", u8"連線測試", model);
-                auto r = AiHttp(provider, key, req, xs::AiOperation::generate, model, {}, nullptr);
+                auto r = AiHttp(provider, key, req, xs::AiOperation::generate, model, {}, nullptr, endpoint);
                 xs::aiAnswer(provider, r.first, r.second);
             }
         } catch (const std::exception &e) { err = ErrText(e); }
@@ -734,8 +1045,25 @@ static NSTextField *L(NSString *s, NSRect r) { NSTextField *l = [NSTextField lab
 
 - (void)save:(id)sender {
     [self keyChanged:nil];
-    if (!_draft.activeKey().empty() && !xs::validOrKey(_draft.activeKey())) {
+    if (xs::aiRequiresKey(_draft.provider) && !_draft.activeKey().empty() && !xs::validOrKey(_draft.activeKey())) {
         _status.stringValue = @"請輸入有效的 API Key（不可包含空白或換行）。";
+        _status.textColor = NSColor.systemRedColor;
+        return;
+    }
+    if (![self checkEndpoint]) return;
+    // 其他服務留下的網址也要正確（儲存時會檢查全部服務），錯誤時指出是哪一家
+    for (xs::AiProvider pv : {xs::AiProvider::ollama, xs::AiProvider::azure}) {
+        xs::OrPreferences probe = _draft;
+        probe.provider = pv;
+        std::string ep = Endpoint(probe);
+        if (!ep.empty() && !xs::aiValidEndpoint(pv, ep)) {
+            _status.stringValue = [NSString stringWithFormat:@"「%@」的服務網址格式不正確，請修正或清空。", N2FromUTF8(xs::aiProviderName(pv))];
+            _status.textColor = NSColor.systemRedColor;
+            return;
+        }
+    }
+    if (xs::aiIsNewProvider(_draft.provider) && !_draft.activeModel().empty() && !xs::validAiModel(_draft.provider, _draft.activeModel())) {
+        _status.stringValue = @"模型 ID 格式不正確。";
         _status.textColor = NSColor.systemRedColor;
         return;
     }

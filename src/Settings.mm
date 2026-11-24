@@ -30,6 +30,11 @@ NSString *const N2KeyHistoryFolder = @"HistoryFolder";
 NSString *const N2KeyUILanguage = @"UILanguage";
 NSString *const N2KeyOpenInTabs = @"OpenInTabs";
 NSString *const N2KeyAlwaysShowTabBar = @"AlwaysShowTabBar";
+NSString *const N2KeyCodeFolding = @"ShowCodeFolding";
+NSString *const N2KeyBookmarkMargin = @"ShowBookmarkMargin";
+NSString *const N2KeyAutoPairBrackets = @"AutoPairBrackets";
+NSString *const N2KeyAutoPairQuotes = @"AutoPairQuotes";
+NSString *const N2KeyRestoreSession = @"RestoreSession";
 
 static NSUserDefaults *UD(void) { return NSUserDefaults.standardUserDefaults; }
 
@@ -85,7 +90,12 @@ static void SetB(NSString *k, BOOL v) { [UD() setBool:v forKey:k]; }
         N2KeyHistoryKeep: @30,
         N2KeyHistoryFolder: @"",
         N2KeyOpenInTabs: @YES,
-        N2KeyAlwaysShowTabBar: @YES,   // 只有一個分頁時也顯示分頁列（含「＋」）   // 開啟文件：YES＝分頁、NO＝新視窗
+        N2KeyAlwaysShowTabBar: @YES,   // 只有一個分頁時也顯示分頁列（含「＋」）
+        N2KeyCodeFolding: @YES,
+        N2KeyBookmarkMargin: @NO,
+        N2KeyAutoPairBrackets: @NO,
+        N2KeyAutoPairQuotes: @NO,
+        N2KeyRestoreSession: @YES,
         N2KeyUILanguage: @"zh-Hant",   // 與 Windows 版相同，預設繁體中文；空字串＝跟隨系統
     };
     [UD() registerDefaults:defaults];
@@ -188,6 +198,15 @@ static CGFloat ClampFontSize(CGFloat v) { return MIN(MAX(v, 4.0), 200.0); }
 }
 + (void)setNewDocumentEOL:(int)v { [UD() setInteger:v forKey:N2KeyNewEOL]; }
 
++ (BOOL)codeFolding { return B(N2KeyCodeFolding); }
++ (void)setCodeFolding:(BOOL)v { SetB(N2KeyCodeFolding, v); }
++ (BOOL)bookmarkMargin { return B(N2KeyBookmarkMargin); }
++ (void)setBookmarkMargin:(BOOL)v { SetB(N2KeyBookmarkMargin, v); }
++ (BOOL)autoPairBrackets { return B(N2KeyAutoPairBrackets); }
++ (void)setAutoPairBrackets:(BOOL)v { SetB(N2KeyAutoPairBrackets, v); }
++ (BOOL)autoPairQuotes { return B(N2KeyAutoPairQuotes); }
++ (void)setAutoPairQuotes:(BOOL)v { SetB(N2KeyAutoPairQuotes, v); }
++ (BOOL)restoreSession { return B(N2KeyRestoreSession); }
 + (BOOL)historyEnabled { return B(N2KeyHistoryEnabled); }
 + (BOOL)openInTabs { return B(N2KeyOpenInTabs); }
 + (BOOL)alwaysShowTabBar { return B(N2KeyAlwaysShowTabBar); }
