@@ -1,6 +1,8 @@
 #pragma once
 #include "ExAlgorithms.h"
 #include "BookmarkMarker.h"
+#include "FilePreferenceKinds.h"
+#include <array>
 #include <algorithm>
 #include <charconv>
 #include <climits>
@@ -17,6 +19,37 @@ constexpr std::string_view header = "[Bookmarks]\r\nVersion=1\r\nLines=";
 constexpr std::string_view colorHeader = "[Bookmarks]\r\nVersion=2\r\nLines=";
 constexpr std::string_view viewHeader = "[View]\r\n";
 constexpr int zoomLimit = 100;
+constexpr std::string_view preferencesHeader = "[FileSettings]\r\n";
+constexpr std::array<std::string_view, XS_PREF_COUNT> preferenceKeys = {
+  "Syntax=", "OpenEncoding=", "WordWrap="
+};
+using FilePreferences = std::array<int, XS_PREF_COUNT>;
+constexpr FilePreferences automaticPreferences = {-1, -1, -1};
+
+inline bool validPreference(std::size_t index, int value) {
+  return value >= 0 && (index == XS_PREF_WORD_WRAP ? value <= 1 : value > 0 && value <= 65535);
+}
+
+inline FilePreferences parsePreferences(std::string_view input) {
+  auto preferences = automaticPreferences;
+  for (auto end = input.find("\r\n"); end != std::string_view::npos; end = input.find("\r\n")) {
+    const auto line = input.substr(0, end);
+    if (!line.empty() && line.front() == '[')
+      break;
+    for (std::size_t index = 0; index < preferenceKeys.size(); ++index) {
+      const auto key = preferenceKeys[index];
+      if (line.substr(0, key.size()) != key)
+        continue;
+      int value = -1;
+      const auto parsed = std::from_chars(line.data() + key.size(), line.data() + line.size(), value);
+      if (parsed.ec == std::errc{} && parsed.ptr == line.data() + line.size() && validPreference(index, value))
+        preferences[index] = value;
+      break;
+    }
+    input.remove_prefix(end + 2);
+  }
+  return preferences;
+}
 
 struct LineBookmark {
   int line;
@@ -57,7 +90,8 @@ inline std::string sidecarName(const std::u16string& name) {
 }
 
 inline std::string serialize(const std::vector<LineBookmark>& lines,
-                             const std::optional<ViewState>& view = std::nullopt) {
+                             const std::optional<ViewState>& view = std::nullopt,
+                             const FilePreferences& preferences = automaticPreferences) {
   const bool hasRed = std::any_of(lines.begin(), lines.end(),
                                 [](const LineBookmark& bookmark) { return bookmark.red; });
   std::string result(hasRed ? colorHeader : header);
@@ -82,9 +116,19 @@ inline std::string serialize(const std::vector<LineBookmark>& lines,
       result += std::to_string((*view).*field.value);
       result += "\r\n";
     }
-    if (result.size() > fileLimit)
-      throw std::length_error("document state file too large");
   }
+  if (preferences != automaticPreferences) {
+    result += preferencesHeader;
+    for (std::size_t index = 0; index < preferences.size(); ++index) {
+      if (validPreference(index, preferences[index])) {
+        result += preferenceKeys[index];
+        result += std::to_string(preferences[index]);
+        result += "\r\n";
+      }
+    }
+  }
+  if (result.size() > fileLimit)
+    throw std::length_error("document state file too large");
   return result;
 }
 
@@ -108,9 +152,17 @@ inline std::optional<ViewState> parseView(std::string_view input) {
 }
 
 inline bool parse(std::string_view input, std::vector<LineBookmark>& output,
-                  std::optional<ViewState>* view = nullptr) {
+                  std::optional<ViewState>* view = nullptr,
+                  FilePreferences* preferences = nullptr) {
   if (input.size() > fileLimit)
     return false;
+  auto parsedPreferences = automaticPreferences;
+  const auto preferencesSection = input.find(preferencesHeader);
+  if (preferencesSection != std::string_view::npos && preferencesSection >= 2 &&
+      input.substr(preferencesSection - 2, 2) == "\r\n") {
+    parsedPreferences = parsePreferences(input.substr(preferencesSection + preferencesHeader.size()));
+    input = input.substr(0, preferencesSection);
+  }
   std::optional<ViewState> parsedView;
   const auto section = input.find(viewHeader);
   if (section != std::string_view::npos && section >= 2 &&
@@ -148,6 +200,8 @@ inline bool parse(std::string_view input, std::vector<LineBookmark>& output,
   output.swap(lines);
   if (view)
     *view = parsedView;
+  if (preferences)
+    *preferences = parsedPreferences;
   return true;
 }
 }

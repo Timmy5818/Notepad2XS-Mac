@@ -5,6 +5,7 @@
 // - 分頁右鍵選單（對應 Windows 版 R143～R146）：重新載入、在 Finder 中顯示、在新視窗開啟、關閉其他分頁、
 //   關閉全部分頁、全部儲存；分頁列空白處右鍵：新增分頁、全部儲存、關閉全部分頁
 // - 重新開啟時還原上次的分頁（R142；只還原已存檔的文件）
+// - 重新開啟關閉的分頁（R158）：⇧⌘T 或分頁列空白處右鍵，最近關閉的優先，最多記住 32 個
 // - 「顯示／隱藏標籤頁列」由系統自動加在「視窗」選單（依 App 的介面語言顯示）
 #import "EditorWindowController.h"
 #import "Document.h"
@@ -321,6 +322,55 @@ void N2RestoreSession(void (^done)(BOOL restored)) {
     RestoreStep(groups ?: @[], 0, 0, nil, nil, NO, done);
 }
 
+#pragma mark - 重新開啟關閉的分頁（R158）
+
+static NSMutableArray<NSDictionary *> *gClosedDocuments;   // {path, member}，最後一個是最近關閉的
+static const NSUInteger kClosedLimit = 32;
+
+// 關閉分頁時記錄（已存檔的文件與壓縮檔成員；未命名與雲端文件不記錄）
+void N2RememberClosedDocument(Document *doc) {
+    NSString *path = nil, *member = nil;
+    if (doc.archiveLink) { path = doc.archiveLink.archiveURL.path; member = doc.archiveLink.memberPath; }
+    else if (doc.fileURL && !N2IsArchiveWorkURL(doc.fileURL) && !doc.cloud) path = doc.fileURL.path;
+    if (!path.length) return;
+    if (!gClosedDocuments) gClosedDocuments = [NSMutableArray array];
+    if (gClosedDocuments.count == kClosedLimit) [gClosedDocuments removeObjectAtIndex:0];
+    [gClosedDocuments addObject:member ? @{@"path": path, @"member": member} : @{@"path": path}];
+}
+
+BOOL N2HasClosedDocuments(void) { return gClosedDocuments.count > 0; }
+
+// 每次重開一個：讀取磁碟上最後儲存的版本並沿用 .2xs；已開啟時切換到該分頁；找不到檔案時提示
+void N2ReopenClosedDocument(void) {
+    if (!gClosedDocuments.count) { NSBeep(); return; }
+    NSDictionary *entry = gClosedDocuments.lastObject;
+    [gClosedDocuments removeLastObject];
+    NSString *path = entry[@"path"], *member = entry[@"member"];
+    for (NSDocument *d in NSDocumentController.sharedDocumentController.documents) {
+        if (![d isKindOfClass:Document.class]) continue;
+        Document *doc = (Document *)d;
+        BOOL same = member ? (doc.archiveLink && [doc.archiveLink.archiveURL.path isEqualToString:path] &&
+                              [doc.archiveLink.memberPath isEqualToString:member])
+                           : (!doc.archiveLink && [doc.fileURL.path isEqualToString:path]);
+        if (same) { [doc.editor.window makeKeyAndOrderFront:nil]; return; }
+    }
+    if (![NSFileManager.defaultManager fileExistsAtPath:path]) {
+        NSAlert *a = [NSAlert new];
+        a.alertStyle = NSAlertStyleWarning;
+        a.messageText = [NSString stringWithFormat:N2L(@"載入「%@」時發生錯誤。"), path.lastPathComponent];
+        a.informativeText = path;
+        [a addButtonWithTitle:N2L(@"確定")];
+        [a runModal];
+        return;
+    }
+    N2SetRequestedArchiveMember(member);
+    [NSDocumentController.sharedDocumentController openDocumentWithContentsOfURL:[NSURL fileURLWithPath:path] display:YES
+        completionHandler:^(NSDocument *doc, BOOL already, NSError *e) {
+        N2SetRequestedArchiveMember(nil);
+        if (e) [NSApp presentError:e];
+    }];
+}
+
 #pragma mark - 分頁列的滑鼠操作（中鍵關閉、右鍵選單）
 
 // 分頁列是系統的私有視圖：從點到的視圖往上找名稱含 "TabButton" 的視圖，
@@ -383,6 +433,7 @@ NSMenu *N2TabContextMenu(NSWindow *tab, NSWindow *window) {
         MenuItem(m, @"關閉其他分頁", @selector(closeOtherTabs:), ed).enabled = (tab.tabbedWindows.count > 1);
     }
     MenuItem(m, @"關閉全部分頁", @selector(closeAllTabs:), ed);
+    if (!tab) MenuItem(m, @"重新開啟關閉的分頁", @selector(reopenClosedTab:), NSApp.delegate).enabled = N2HasClosedDocuments();
     [m addItem:NSMenuItem.separatorItem];
     NSMenuItem *saveAll = MenuItem(m, @"全部儲存", @selector(saveAllDocuments:), NSApp.delegate);
     saveAll.enabled = YES;

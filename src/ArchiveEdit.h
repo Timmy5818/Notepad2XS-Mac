@@ -36,6 +36,9 @@ N2ArchiveKind N2ArchiveKindForURL(NSURL *url);
 - (void)cleanup;
 @end
 
+// 下一次開啟壓縮檔時直接選這個成員（重新開啟關閉的分頁用）；nil 清除
+void N2SetRequestedArchiveMember(NSString *member);
+
 // 判斷檔案是否位於壓縮檔暫存區（不加入最近使用的檔案）
 BOOL N2IsArchiveWorkURL(NSURL *url);
 

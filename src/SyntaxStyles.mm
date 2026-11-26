@@ -400,3 +400,29 @@ static void ApplyLexerStyles(ScintillaView *v, const LangInfo *lang, NSString *f
     }
     Send(v, SCI_COLOURISE, 0, -1);
 }
+
+#pragma mark - Windows 版語法資源 ID
+
+static const struct { int resource; NSString *langID; } kSyntaxResources[] = {
+    {63000, @"text"}, {63001, @"html"}, {63001, @"php"}, {63002, @"xml"}, {63003, @"css"},
+    {63004, @"c"}, {63004, @"objc"}, {63004, @"swift"}, {63005, @"csharp"}, {63007, @"makefile"},
+    {63010, @"js"}, {63010, @"ts"}, {63011, @"java"}, {63011, @"kotlin"}, {63015, @"ini"},
+    {63016, @"batch"}, {63017, @"diff"}, {63018, @"sql"}, {63019, @"python"}, {63023, @"bash"},
+    {63034, @"markdown"}, {63038, @"json"},
+};
+
+int N2SyntaxResourceForLanguage(NSString *langID) {
+    for (const auto &r : kSyntaxResources) if ([r.langID isEqualToString:langID]) return r.resource;
+    return 63000;
+}
+
+NSString *N2LanguageForSyntaxResource(int resource, NSString *fileName) {
+    NSString *automatic = N2SyntaxLanguageForFileName(fileName);
+    NSString *first = nil;
+    for (const auto &r : kSyntaxResources) {
+        if (r.resource != resource) continue;
+        if ([r.langID isEqualToString:automatic]) return automatic;
+        if (!first) first = r.langID;
+    }
+    return first;
+}

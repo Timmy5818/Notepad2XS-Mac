@@ -289,3 +289,33 @@ int N2DetectEOLMode(const char *s, size_t n, int defaultMode) {
     if (lf >= cr) return SC_EOL_LF;
     return SC_EOL_CR;
 }
+
+int N2EncodingReadResource(N2Encoding enc) {
+    switch (enc) {
+        case N2EncodingUTF8:
+        case N2EncodingUTF8BOM:       return 61006;
+        case N2EncodingUTF16LE:       return 61004;
+        case N2EncodingUTF16BE:       return 61005;
+        case N2EncodingBig5:          return 61022;
+        case N2EncodingGB18030:       return 61072;
+        case N2EncodingShiftJIS:      return 61046;
+        case N2EncodingWindows1252:   return 61067;
+        default:                      return -1;
+    }
+}
+
+BOOL N2EncodingForReadResource(int resource, N2Encoding *enc) {
+    N2Encoding e;
+    switch (resource) {
+        case 61006: case 61007: e = N2EncodingUTF8; break;
+        case 61002: case 61004: e = N2EncodingUTF16LE; break;
+        case 61003: case 61005: e = N2EncodingUTF16BE; break;
+        case 61022: e = N2EncodingBig5; break;
+        case 61020: case 61072: e = N2EncodingGB18030; break;   // GBK 用 GB18030 讀取（GB18030 包含 GBK）
+        case 61046: e = N2EncodingShiftJIS; break;
+        case 61067: e = N2EncodingWindows1252; break;
+        default: return NO;
+    }
+    if (enc) *enc = e;
+    return YES;
+}

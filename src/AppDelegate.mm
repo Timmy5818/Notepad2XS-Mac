@@ -71,6 +71,9 @@ void N2ShowFileSearch(void);
                            completionHandler:^(NSDocument *doc, BOOL already, NSError *e) {
             if ([doc isKindOfClass:Document.class]) {
                 ((Document *)doc).archiveLink = link;
+                // R155：壓縮檔成員指定過開檔編碼時，用該編碼重新讀取
+                int preferred = [N2BookmarkContext encodingPreferenceForURL:link.archiveURL member:link.memberPath];
+                if (preferred != -1) [(Document *)doc reloadWithPreferredEncoding:preferred];
                 for (NSWindowController *wc in doc.windowControllers) [wc synchronizeWindowTitleWithDocumentName];
                 [((Document *)doc).editor loadBookmarks];   // 書籤設定檔在壓縮檔旁的 .2xs（名稱含成員路徑）
             } else {
@@ -119,9 +122,20 @@ void N2ShowFileSearch(void);
 }
 
 // 結束時記錄目前的分頁，下次啟動還原（只記已存檔的文件）
-- (void)applicationWillTerminate:(NSNotification *)n { if (!_resetting) N2SaveSession(); }
+- (void)applicationWillTerminate:(NSNotification *)n {
+    N2CloudPrepareForTermination();   // 各分頁接著保存雲端逐檔設定：伺服器連不上時不要卡太久
+    if (!_resetting) N2SaveSession();
+}
 
 - (IBAction)saveAllDocuments:(id)sender { N2SaveAllDocuments(); }
+- (IBAction)reopenClosedTab:(id)sender { N2ReopenClosedDocument(); }
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+    if (item.action == @selector(reopenClosedTab:)) return N2HasClosedDocuments();
+    return YES;
+}
+// 沒有文件視窗時也能開啟雲端檔案與設定（有視窗時由編輯視窗處理，開在同一個視窗的分頁）
+- (IBAction)showCloudFiles:(id)sender { N2OpenCloudFiles(nil); }
+- (IBAction)showCloudSettings:(id)sender { N2CloudShowSettings(nil); }
 
 #pragma mark - Dock 選單（對應 Windows 版 R152 工作列「工作」）
 
@@ -230,6 +244,11 @@ static EditorWindowController *FrontEditor(void) {
     Item(file, @"開啟…", @selector(openDocument:), @"o");
     NSMenu *recent = Submenu(file, @"打開最近使用的檔案");
     Item(recent, @"清除選單", @selector(clearRecentDocuments:), nil);   // 系統會自動填入最近檔案
+    Item(file, @"重新開啟關閉的分頁", @selector(reopenClosedTab:), @"t", C | S);
+    Sep(file);
+    Item(file, @"雲端檔案…", @selector(showCloudFiles:), @"o", C | O);
+    Item(file, @"存到雲端…", @selector(saveToCloud:), nil);
+    Item(file, @"雲端設定…", @selector(showCloudSettings:), nil);
     Sep(file);
     Item(file, @"關閉", @selector(performClose:), @"w");
     Item(file, @"儲存", @selector(saveDocument:), @"s");
@@ -241,6 +260,8 @@ static EditorWindowController *FrontEditor(void) {
     Sep(file);
     NSMenu *enc = Submenu(file, @"編碼（存檔用）");
     NSMenu *reopen = Submenu(file, @"以指定編碼重新載入");
+    Item(reopen, @"以自動偵測編碼重新載入", @selector(reloadWithAutoEncoding:), nil);
+    Sep(reopen);
     for (NSInteger e = 0; e < N2EncodingCount; e++) {
         Item(enc, N2EncodingDisplayName((N2Encoding)e), @selector(setSaveEncoding:), nil, 0, e);
         Item(reopen, N2EncodingDisplayName((N2Encoding)e), @selector(reopenWithEncoding:), nil, 0, e);
@@ -358,8 +379,11 @@ static EditorWindowController *FrontEditor(void) {
     NSArray *ids = N2SyntaxLanguageIDs();
     for (NSInteger i = 0; i < (NSInteger)ids.count; i++)
         Item(lang, N2SyntaxDisplayName(ids[i]), @selector(selectLanguage:), nil, 0, i);
+    Item(format, @"此檔案恢復自動判斷語法", @selector(resetFileSyntax:), nil);
     Sep(format);
     Item(format, @"自動換行", @selector(toggleWordWrap:), nil);
+    Item(format, @"此檔案自動換行", @selector(toggleFileWordWrap:), nil);
+    Item(format, @"此檔案恢復預設換行", @selector(resetFileWordWrap:), nil);
     NSMenu *wrap = Submenu(format, @"換行與段落");
     Item(wrap, @"依欄寬換行…", @selector(wrapToColumn:), nil);
     Item(wrap, @"依視窗寬度拆分行", @selector(splitLinesToWindow:), nil);

@@ -144,7 +144,13 @@ int main() {
         BOOL hidden = stat(folder.fileSystemRepresentation, &st) == 0 && (st.st_flags & UF_HIDDEN);
         Check(hidden, "開檔就建立隱藏的 .2xs 資料夾");
         NSString *readme = [NSString stringWithContentsOfFile:[folder stringByAppendingPathComponent:@"readme.txt"] encoding:NSUTF8StringEncoding error:nil];
-        Check([readme containsString:@"notepad2xs 相關設定檔用資料夾"], "內有 readme.txt");
+        NSData *readmeBytes = [NSData dataWithContentsOfFile:[[dir stringByAppendingPathComponent:@".2xs"] stringByAppendingPathComponent:@"readme.txt"]];
+        BOOL ascii = readmeBytes.length > 0;
+        for (NSUInteger i = 0; i < readmeBytes.length; i++) if (((const unsigned char *)readmeBytes.bytes)[i] >= 0x80) ascii = NO;
+        Check(ascii && [readme hasPrefix:@"Notepad2XS Per-File Settings\r\n"] &&
+              [readme containsString:@"syntax highlighting, opening encoding, and word wrap"] &&
+              [readme containsString:@"Official website\r\nhttps://dz.jplopsoft.idv.tw/\r\n"] &&
+              [readme containsString:@"Contact email\r\nhawl.remotek@gmail.com\r\n"], "readme.txt 是英文 ASCII 說明（R157）");
         NSURL *ini = N2BookmarkSidecarURL(doc, nil);
         NSString *expectName = [[NSString alloc] initWithUTF8String:sidecarName(u"工作筆記.txt").c_str()];
         Check([ini.lastPathComponent isEqualToString:expectName], "設定檔名稱與 Windows 版相同（EX_MD3(工作筆記.txt).ini）");
@@ -202,6 +208,73 @@ int main() {
         [[N2BookmarkContext new] save:v5 url:[NSURL fileURLWithPath:doc5] member:nil locked:NO mode:N2BookmarkSaveNewTarget];
         Check(![NSFileManager.defaultManager fileExistsAtPath:N2BookmarkSidecarURL([NSURL fileURLWithPath:[dir stringByAppendingPathComponent:@"z.txt"]], nil).path],
               ".2xs 是符號連結時不寫入");
+
+        // R155 個別檔案設定（測試案例取自 Windows 版 XSR138BookmarksTests.cpp）
+        constexpr int javascript = 63010, big5 = 61022;
+        const FilePreferences custom{javascript, big5, 0};
+        FilePreferences parsedPrefs = automaticPreferences;
+        std::vector<LineBookmark> mixed2{{1}, {6, true}};
+        ViewState reading2{3, 1, 0, 4, 2, 1};
+        Check(parse(serialize(mixed2, reading2, custom), numbers, &parsedView, &parsedPrefs) && numbers == mixed2 &&
+              parsedView == reading2 && parsedPrefs == custom, "[FileSettings] 與書籤、檢視狀態並存");
+        Check(parse(serialize(mixed2, reading2) + "[FileSettings]\r\nSyntax=bad\r\nOpenEncoding=61022\r\nWordWrap=999\r\n",
+                    numbers, &parsedView, &parsedPrefs) && parsedPrefs == FilePreferences({-1, big5, -1}), "不合法的設定值改回自動");
+        Check(parse(serialize(mixed2, reading2), numbers, &parsedView, &parsedPrefs) && parsedPrefs == automaticPreferences,
+              "舊版設定檔沒有 [FileSettings]");
+
+        NSString *prefsDoc = [dir stringByAppendingPathComponent:@"app.txt"];
+        [@"a\nb\nc\n" writeToFile:prefsDoc atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        NSURL *prefsURL = [NSURL fileURLWithPath:prefsDoc];
+        N2BookmarkContext *pc = [N2BookmarkContext new];
+        __block int applied = 0;
+        pc.applyPreferences = ^{ applied++; };
+        ScintillaView *pv = Editor("a\nb\nc\n");
+        [pc loadInto:pv url:prefsURL member:nil locked:NO];
+        Check(applied == 1 && [pc preference:N2FilePrefSyntax] == -1, "開檔時讀取設定（預設為自動）");
+        Check([pc setPreference:N2FilePrefSyntax value:javascript url:prefsURL member:nil] &&
+              [pc setPreference:N2FilePrefEncoding value:big5 url:prefsURL member:nil] &&
+              [pc setPreference:N2FilePrefWordWrap value:1 url:prefsURL member:nil], "設定語法、開檔編碼、換行並立即寫入");
+        Check(![pc setPreference:N2FilePrefWordWrap value:2 url:prefsURL member:nil], "拒絕不合法的換行值");
+        Check([N2BookmarkContext encodingPreferenceForURL:prefsURL member:nil] == big5, "開檔前讀取指定的開檔編碼");
+        Check([N2BookmarkContext encodingPreferenceForURL:[NSURL fileURLWithPath:[dir stringByAppendingPathComponent:@"none.txt"]] member:nil] == -1,
+              "沒有設定的檔案回傳 -1");
+        NSString *prefsIni = [NSString stringWithContentsOfURL:N2BookmarkSidecarURL(prefsURL, nil) encoding:NSUTF8StringEncoding error:nil];
+        Check([prefsIni hasSuffix:@"[FileSettings]\r\nSyntax=63010\r\nOpenEncoding=61022\r\nWordWrap=1\r\n"], "設定檔格式與 Windows 版相同");
+        S(pv, SCI_MARKERADD, 1, N2RedBookmark);
+        [pc save:pv url:prefsURL member:nil locked:NO mode:N2BookmarkSaveChanged];
+        prefsIni = [NSString stringWithContentsOfURL:N2BookmarkSidecarURL(prefsURL, nil) encoding:NSUTF8StringEncoding error:nil];
+        Check([prefsIni hasPrefix:@"[Bookmarks]\r\nVersion=2\r\nLines=2r\r\n"] && [prefsIni containsString:@"Syntax=63010"],
+              "存書籤時保留個別設定");
+        [pc setPreference:N2FilePrefEncoding value:-1 url:prefsURL member:nil];
+        N2BookmarkContext *pc2 = [N2BookmarkContext new];
+        [pc2 loadInto:Editor("a\nb\nc\n") url:prefsURL member:nil locked:NO];
+        Check([pc2 preference:N2FilePrefSyntax] == javascript && [pc2 preference:N2FilePrefEncoding] == -1 &&
+              [pc2 preference:N2FilePrefWordWrap] == 1, "重新開啟後恢復設定；恢復自動的欄位不再寫入");
+
+        // R161 雲端逐檔設定：與 .2xs 相同格式，解密後才套用
+        N2BookmarkContext *cc = [N2BookmarkContext new];
+        std::string cloudState = serialize({{2}, {3, true}}, ViewState{0, 0, 0, 2, 1, 2}, FilePreferences{63034, -1, 0});
+        __block int cloudApplied = 0;
+        cc.applyPreferences = ^{ cloudApplied++; };
+        Check([cc stageCloudState:[NSData dataWithBytes:cloudState.data() length:cloudState.size()]] && cloudApplied == 0 &&
+              [cc preference:N2FilePrefSyntax] == 63034, "雲端設定先暫存，不立即套用");
+        Check(![cc stageCloudState:[@"[Bookmarks]\r\nVersion=9\r\n" dataUsingEncoding:NSUTF8StringEncoding]], "拒絕格式錯誤的雲端設定");
+        [cc stageCloudState:[NSData dataWithBytes:cloudState.data() length:cloudState.size()]];
+        ScintillaView *cv = Editor("1\n2\n3\n4\n");
+        [cc loadAfterUnlock:cv];
+        Check(cloudApplied == 1 && Marks(cv, 1) == (1u << N2BlueBookmark) && Marks(cv, 2) == (1u << N2RedBookmark) &&
+              S(cv, SCI_GETZOOM) == 2, "解密後套用雲端書籤、縮放與設定");
+        S(cv, SCI_MARKERADD, 0, N2BlueBookmark);
+        NSData *withMarks = [cc cloudSnapshot:cv includeBookmarks:YES];
+        NSData *kept = [cc cloudSnapshot:cv includeBookmarks:NO];
+        NSString *withText = [[NSString alloc] initWithData:withMarks encoding:NSUTF8StringEncoding];
+        NSString *keptText = [[NSString alloc] initWithData:kept encoding:NSUTF8StringEncoding];
+        Check([withText hasPrefix:@"[Bookmarks]\r\nVersion=2\r\nLines=1,2,3r\r\n"] && [withText hasSuffix:@"[FileSettings]\r\nSyntax=63034\r\nWordWrap=0\r\n"],
+              "雲端快照包含目前書籤與設定");
+        Check([keptText hasPrefix:@"[Bookmarks]\r\nVersion=2\r\nLines=2,3r\r\n"], "捨棄修改時保留上次儲存的書籤");
+        [cc commitCloudSnapshot:withMarks];
+        Check([[[NSString alloc] initWithData:[cc cloudSnapshot:cv includeBookmarks:NO] encoding:NSUTF8StringEncoding] hasPrefix:@"[Bookmarks]\r\nVersion=2\r\nLines=1,2,3r"],
+              "寫入成功後以新書籤為準");
 
         [NSFileManager.defaultManager removeItemAtPath:dir error:nil];
         printf(fails ? "失敗 %d 項\n" : "全部通過（%d 項）\n", fails ? fails : passes);

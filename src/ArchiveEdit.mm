@@ -369,6 +369,9 @@ static void InBackground(dispatch_block_t work, dispatch_block_t then) {
     });
 }
 
+static NSString *gRequestedMember;
+void N2SetRequestedArchiveMember(NSString *member) { gRequestedMember = [member copy]; }
+
 + (void)openArchive:(NSURL *)url completion:(void (^)(N2ArchiveLink *, NSError *))completion {
     N2ArchiveKind kind = N2ArchiveKindForURL(url);
     if (kind == N2ArchiveConvert) {
@@ -404,7 +407,13 @@ static void InBackground(dispatch_block_t work, dispatch_block_t then) {
             [editable addObject:e];
         }
         if (editable.count == 0) { completion(nil, Err(@"壓縮檔裡沒有可以編輯的文字文件。", nil)); return; }
-        N2ArchiveEntry *chosen = editable.count == 1 ? editable.firstObject : ChooseMember(editable, url.lastPathComponent);
+        N2ArchiveEntry *chosen = nil;
+        if (gRequestedMember) {
+            for (N2ArchiveEntry *e in editable) if ([e.path isEqualToString:gRequestedMember]) chosen = e;
+            gRequestedMember = nil;
+            if (!chosen) { completion(nil, Err(@"壓縮檔裡沒有可以編輯的文字文件。", nil)); return; }
+        }
+        if (!chosen) chosen = editable.count == 1 ? editable.firstObject : ChooseMember(editable, url.lastPathComponent);
         if (!chosen) { completion(nil, nil); return; }
         [self extract:chosen from:url kind:kind completion:completion];
     });

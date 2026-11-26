@@ -313,7 +313,7 @@ void pack(uint32_t v, std::string &out) {
   }
   out.append(c, 5);
 }
-uint32_t unpack(const std::string &s, size_t pos) {
+uint32_t unpack(std::string_view s, size_t pos) {
   if (pos > s.size() || s.size() - pos < 5)
     throw std::runtime_error("format");
   uint32_t n = 0;
@@ -605,3 +605,19 @@ std::string exesDecrypt(const std::string &cipher,
   return out;
 }
 } // namespace xs
+
+namespace xs {
+bool validX60Envelope(std::string_view cipher) noexcept {
+  if (cipher.size() < 203 || cipher.size() > 203 + ((64 * 1024 * 1024 + 2) / 3) * 5 ||
+      cipher.compare(0, 3, "X60") || (cipher.size() - 203) % 5)
+    return false;
+  try {
+    uint32_t word = 0;
+    for (size_t i = 3; i < cipher.size(); i += 5)
+      word = unpack(cipher, i);
+    return (word & 0xffff) == 0;
+  } catch (...) {
+    return false;
+  }
+}
+}

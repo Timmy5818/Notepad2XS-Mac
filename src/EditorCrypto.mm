@@ -98,6 +98,7 @@ static sptr_t SC(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0)
         }, ^(BOOL ok, const std::string &cipher, NSString *err) {
             if (!ok) { [self showMessage:@"加密失敗，文件沒有變更。" info:@"文字可能超過 64 MiB，或含有無效的字元。"]; return; }
             if (self.wholeText != text) { [self showMessage:@"加密期間文件被修改，已取消。" info:nil]; return; }
+            if (alg == N2CryptoEXES) [self rememberStateBeforeEncryption];   // 存到雲端時的初始逐檔設定
             [self replaceDocument:cipher asBaseline:NO];
             // 新密文：唯讀，存檔時原樣保存；不保留這次的密碼
             doc.cryptoState = N2CryptoLockedNewCipher;

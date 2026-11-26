@@ -21,6 +21,7 @@
 #import "../../src/Document.h"
 #import "ScintillaView.h"
 #import <WebKit/WebKit.h>
+#import <objc/message.h>
 
 static NSArray<NSString *> *gLines;
 static NSMenu *gTracking;   // 目前正在顯示的選單（右鍵選單）
@@ -51,6 +52,28 @@ static NSWindow *FrontWindow(void) {
     return w;
 }
 
+// 雲端檔案視窗（N2CloudBrowser 是它的 delegate）
+static NSWindow *CloudWindow(void) {
+    Class cls = NSClassFromString(@"N2CloudBrowser");
+    for (NSWindow *x in NSApp.windows) if (x.isVisible && [x.delegate isKindOfClass:cls]) return x;
+    return nil;
+}
+static NSTableView *FirstTable(NSWindow *x) {
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:x.contentView ?: [NSView new]];
+    while (stack.count) {
+        NSView *v = stack.firstObject; [stack removeObjectAtIndex:0];
+        if ([v isKindOfClass:NSTableView.class] && !v.isHiddenOrHasHiddenAncestor) return (NSTableView *)v;
+        [stack addObjectsFromArray:v.subviews];
+    }
+    return nil;
+}
+static void PrintMenu(NSMenu *m, NSString *indent) {
+    for (NSMenuItem *it in m.itemArray) {
+        if (it.isSeparatorItem) { Out(@"%@----", indent); continue; }
+        Out(@"%@%@%@%@", indent, it.title, it.state == NSControlStateValueOn ? @" ✓" : @"", it.isEnabled ? @"" : @"（停用）");
+        if (it.submenu) PrintMenu(it.submenu, [indent stringByAppendingString:@"    "]);
+    }
+}
 static EditorWindowController *Editor(void) { return (EditorWindowController *)DocWindow().windowController; }
 
 static NSMenuItem *FindMenu(NSString *path) {
@@ -296,13 +319,13 @@ static void Exec(NSString *line) {
         if (!done) Out(@"button: 找不到「%@」", rest);
         delay = 0.5;
     } else if ([cmd isEqualToString:@"field"]) {
-        // field <編號> <文字>：設定目前最前面視窗的第 N 個可編輯文字欄位
-        NSWindow *x = FrontWindow();
+        // field <編號> <文字>：設定目前最前面視窗（有強制回應視窗時用它）的第 N 個可編輯文字欄位
+        NSWindow *x = NSApp.modalWindow ?: FrontWindow();
         NSMutableArray<NSTextField *> *fields = [NSMutableArray array];
         NSMutableArray *stack = [NSMutableArray arrayWithObject:x.contentView];
         while (stack.count) {
             NSView *v = stack.firstObject; [stack removeObjectAtIndex:0];
-            if ([v isKindOfClass:NSTextField.class] && ((NSTextField *)v).isEditable) [fields addObject:(NSTextField *)v];
+            if ([v isKindOfClass:NSTextField.class] && ((NSTextField *)v).isEditable && !v.isHiddenOrHasHiddenAncestor) [fields addObject:(NSTextField *)v];
             [stack addObjectsFromArray:v.subviews];
         }
         [fields sortUsingComparator:^NSComparisonResult(NSTextField *a, NSTextField *b) {
@@ -312,7 +335,13 @@ static void Exec(NSString *line) {
         }];
         NSInteger n = [parts[1] integerValue];
         NSString *val = parts.count > 2 ? [rest substringFromIndex:[parts[1] length] + 1] : @"";
-        if (n < (NSInteger)fields.count) { fields[n].stringValue = val; Out(@"field %ld = %@", (long)n, val); }
+        if (n < (NSInteger)fields.count) {
+            fields[n].stringValue = val;
+            // 與實際輸入相同：通知 delegate 文字已變更（啟用「確定」等按鈕）
+            [NSNotificationCenter.defaultCenter postNotificationName:NSControlTextDidChangeNotification object:fields[n]
+                                                            userInfo:@{@"NSFieldEditor": [NSTextView new]}];
+            Out(@"field %ld = %@", (long)n, val);
+        }
         else Out(@"field: 只有 %lu 個欄位", (unsigned long)fields.count);
         delay = 0.2;
     } else if ([cmd isEqualToString:@"labels"]) {
@@ -451,7 +480,7 @@ static void Exec(NSString *line) {
         delay = 1.5;
     } else if ([cmd isEqualToString:@"popup"]) {
         // popup <編號> <項目標題>：在最前面視窗（含附加的對話框）選取第 N 個彈出式選單的項目並觸發動作
-        NSWindow *x = FrontWindow();
+        NSWindow *x = NSApp.modalWindow ?: FrontWindow();
         NSMutableArray<NSPopUpButton *> *pops = [NSMutableArray array];
         NSMutableArray *stack = [NSMutableArray arrayWithObject:x.contentView];
         while (stack.count) {
@@ -537,6 +566,132 @@ static void Exec(NSString *line) {
         if (!web) Out(@"js: 找不到 WKWebView");
         else [web evaluateJavaScript:rest completionHandler:^(id r, NSError *e) { Out(@"js → %@%@", r ?: @"", e ? e.localizedDescription : @""); }];
         delay = 0.5;
+    } else if ([cmd isEqualToString:@"press"]) {
+        // 稍後才按下按鈕（按鈕可能開啟強制回應視窗）；優先找最上層的強制回應視窗
+        NSString *title = rest;
+        After(0.05, ^{
+            NSMutableArray *wins = [NSMutableArray array];
+            if (NSApp.modalWindow) [wins addObject:NSApp.modalWindow];
+            for (NSWindow *x in NSApp.windows) if (x.isVisible && x != NSApp.modalWindow) [wins addObject:x];
+            for (NSWindow *x in wins) {
+                NSMutableArray *stack = [NSMutableArray arrayWithObject:x.contentView];
+                while (stack.count) {
+                    NSView *v = stack.lastObject; [stack removeLastObject];
+                    if ([v isKindOfClass:NSButton.class] && [((NSButton *)v).title isEqualToString:title] && ((NSButton *)v).isEnabled) {
+                        Out(@"press: 「%@」（%@）", title, x.title);
+                        [(NSButton *)v performClick:nil];
+                        return;
+                    }
+                    [stack addObjectsFromArray:v.subviews];
+                }
+            }
+            Out(@"press: 找不到可用的「%@」", title);
+        });
+        delay = 0.8;
+    } else if ([cmd isEqualToString:@"cloud"]) {
+        // cloud <selector> [tag]：送給雲端檔案視窗（稍後送出，動作可能開啟強制回應視窗）
+        NSString *selName = parts[1];
+        NSInteger tag = parts.count > 2 ? [parts[2] integerValue] : 0;
+        After(0.05, ^{
+            id b = CloudWindow().delegate;
+            NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+            it.tag = tag;
+            SEL sel = NSSelectorFromString(selName);
+            if (![b respondsToSelector:sel]) { Out(@"cloud: 沒有 %@", selName); return; }
+            Out(@"cloud %@ %ld", selName, (long)tag);
+            ((void (*)(id, SEL, id))objc_msgSend)(b, sel, it);
+        });
+        delay = 0.8;
+    } else if ([cmd isEqualToString:@"row"]) {
+        NSTableView *tv = FirstTable(CloudWindow() ?: FrontWindow());
+        NSInteger r = rest.integerValue;
+        if (r < 0) [tv deselectAll:nil];
+        else [tv selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)r] byExtendingSelection:NO];
+        Out(@"row %ld（共 %ld 列）", (long)r, (long)tv.numberOfRows);
+        delay = 0.1;
+    } else if ([cmd isEqualToString:@"cloudkey"]) {
+        // 直接送按鍵給雲端檔案視窗的表格（稍後送出）
+        NSString *name = parts[1], *mods = parts.count > 2 ? parts[2] : @"";
+        After(0.05, ^{
+            static NSDictionary *special = @{@"F2": @(NSF2FunctionKey), @"F5": @(NSF5FunctionKey), @"Return": @('\r'),
+                                             @"Delete": @(127), @"Up": @(NSUpArrowFunctionKey)};
+            unichar c = special[name] ? (unichar)[special[name] integerValue] : [name characterAtIndex:0];
+            NSString *chars = [NSString stringWithCharacters:&c length:1];
+            NSWindow *w = CloudWindow();
+            NSEvent *e = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:Mods(mods)
+                                         timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:w.windowNumber context:nil
+                                        characters:chars charactersIgnoringModifiers:chars isARepeat:NO keyCode:0];
+            Out(@"cloudkey %@ %@", name, mods);
+            [FirstTable(w) keyDown:e];
+        });
+        delay = 0.8;
+    } else if ([cmd isEqualToString:@"drop"]) {
+        // drop <資料夾 UUID|-> <路徑…>：模擬從 Finder 拖曳檔案到清單
+        NSString *folder = [parts[1] isEqualToString:@"-"] ? nil : parts[1];
+        NSMutableArray *urls = [NSMutableArray array];
+        for (NSUInteger i = 2; i < parts.count; i++) [urls addObject:[NSURL fileURLWithPath:parts[i]]];
+        After(0.05, ^{
+            id b = CloudWindow().delegate;
+            Out(@"drop %lu 個檔案", (unsigned long)urls.count);
+            ((void (*)(id, SEL, id, id))objc_msgSend)(b, NSSelectorFromString(@"uploadDropped:toFolder:"), urls, folder);
+        });
+        delay = 0.8;
+    } else if ([cmd isEqualToString:@"ctxmenu"]) {
+        // ctxmenu <列>：印出該列（-1＝空白處）的右鍵選單
+        id b = CloudWindow().delegate;
+        id item = ((id (*)(id, SEL, NSInteger))objc_msgSend)(b, NSSelectorFromString(@"itemAtRow:"), rest.integerValue);
+        NSMenu *m = ((id (*)(id, SEL, id))objc_msgSend)(b, NSSelectorFromString(@"menuForItem:"), item);
+        PrintMenu(m, @"  ");
+        delay = 0.05;
+    } else if ([cmd isEqualToString:@"headermenu"]) {
+        NSTableView *tv = FirstTable(CloudWindow());
+        NSMenu *m = tv.headerView.menu;
+        [m.delegate menuNeedsUpdate:m];
+        PrintMenu(m, @"  ");
+        Out(@"  欄位順序：%@", [[tv.tableColumns valueForKey:@"title"] componentsJoinedByString:@" | "]);
+        NSMutableArray *hidden = [NSMutableArray array];
+        for (NSTableColumn *c in tv.tableColumns) if (c.hidden) [hidden addObject:c.title];
+        Out(@"  隱藏：%@  排序指示：%@", [hidden componentsJoinedByString:@","], ({
+            NSMutableArray *ind = [NSMutableArray array];
+            for (NSTableColumn *c in tv.tableColumns) if ([tv indicatorImageInTableColumn:c]) [ind addObject:[NSString stringWithFormat:@"%@(%@)", c.title, [tv indicatorImageInTableColumn:c].name]];
+            [ind componentsJoinedByString:@","]; }));
+        delay = 0.05;
+    } else if ([cmd isEqualToString:@"colmove"]) {
+        NSTableView *tv = FirstTable(CloudWindow());
+        [tv moveColumn:[parts[1] integerValue] toColumn:[parts[2] integerValue]];
+        delay = 0.2;
+    } else if ([cmd isEqualToString:@"colwidth"]) {
+        NSTableView *tv = FirstTable(CloudWindow());
+        NSTableColumn *c = [tv tableColumnWithIdentifier:parts[1]];
+        c.width = [parts[2] doubleValue];
+        delay = 0.2;
+    } else if ([cmd isEqualToString:@"colclick"]) {
+        NSTableView *tv = FirstTable(CloudWindow());
+        NSTableColumn *c = [tv tableColumnWithIdentifier:rest];
+        [tv.delegate tableView:tv didClickTableColumn:c];
+        delay = 0.2;
+    } else if ([cmd isEqualToString:@"modal"]) {
+        // 印出目前強制回應視窗（NSAlert 等）的文字
+        NSWindow *x = NSApp.modalWindow;
+        if (!x) Out(@"modal: 沒有");
+        NSMutableArray *stack = [NSMutableArray arrayWithObject:x.contentView ?: [NSView new]];
+        while (x && stack.count) {
+            NSView *v = stack.firstObject; [stack removeObjectAtIndex:0];
+            if ([v isKindOfClass:NSTextField.class] && ((NSTextField *)v).stringValue.length) Out(@"  %@", ((NSTextField *)v).stringValue);
+            [stack addObjectsFromArray:v.subviews];
+        }
+        delay = 0.05;
+    } else if ([cmd isEqualToString:@"getdefault"]) {
+        Out(@"%@ = %@", rest, [NSUserDefaults.standardUserDefaults objectForKey:rest]);
+        delay = 0.05;
+    } else if ([cmd isEqualToString:@"cloudsnap"]) {
+        NSWindow *x = NSApp.modalWindow ?: CloudWindow();
+        NSView *v = x.contentView.superview ?: x.contentView;
+        NSBitmapImageRep *rep = [v bitmapImageRepForCachingDisplayInRect:v.bounds];
+        [v cacheDisplayInRect:v.bounds toBitmapImageRep:rep];
+        [[rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:rest atomically:YES];
+        Out(@"cloudsnap: %@ (%@)", rest, x.title);
+        delay = 0.1;
     } else if ([cmd isEqualToString:@"echo"]) {
         Out(@"%@", rest);
         delay = 0.01;

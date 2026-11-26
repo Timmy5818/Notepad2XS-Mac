@@ -6,6 +6,10 @@
 #include "ExAlgorithms.h"
 #include "AesAlgorithms.h"
 #include "ImageCommentFormat.h"
+#include "CryptoPrefix.h"
+#import "BookmarkStore.h"
+#import "Localization.h"
+#include <objc/message.h>
 #import "History.h"
 #import <Security/SecRandom.h>
 
@@ -16,6 +20,7 @@
     NSURL *_saveTargetURL;      // 這次存檔的目的地
     NSUInteger _savedModCount;  // dataOfType 取文字時編輯區的修改次數
     NSData *_saveSnapshot;      // 存檔開始時（主執行緒）取下的全文；背景寫入時使用
+    BOOL _closing;
 }
 
 // 依副檔名判斷圖片格式（與 Windows 版 imageFormatForPath 相同）
@@ -131,7 +136,38 @@ static NSError *ImageError(NSString *msg, const std::string &detail) {
         NSData *data = [NSData dataWithContentsOfURL:url options:0 error:outError];
         return data && [self readImage:data format:ImageFormat(url) error:outError];
     }
-    return [super readFromURL:url ofType:typeName error:outError];
+    NSData *raw = [NSData dataWithContentsOfURL:url options:0 error:outError];
+    if (!raw) return NO;
+    // R155：這個檔案指定過開檔編碼（.2xs）時，先用該編碼讀取；密文開頭的檔案照常判斷
+    int preferred = N2IsArchiveWorkURL(url) ? -1 : [N2BookmarkContext encodingPreferenceForURL:url member:nil];
+    if ([self applyPreferredEncoding:preferred raw:raw]) return YES;
+    return [self readFromData:raw ofType:typeName error:outError];
+}
+
+- (BOOL)applyPreferredEncoding:(int)preferred raw:(NSData *)raw {
+    N2Encoding enc;
+    if (preferred == -1 || !N2EncodingForReadResource(preferred, &enc) ||
+        xs::hasEncodedCryptoPrefix((const char *)raw.bytes, raw.length)) return NO;
+    const unsigned char *p = (const unsigned char *)raw.bytes;
+    if (enc == N2EncodingUTF8 && raw.length >= 3 && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF) enc = N2EncodingUTF8BOM;
+    NSData *utf8 = N2DecodeToUTF8(raw, &enc, NO);
+    if (!utf8) return NO;
+    [self applyLoadedText:utf8 encoding:enc];
+    return YES;
+}
+
+// 壓縮檔成員：成員資訊設定好後才知道 .2xs 的名稱，再依指定的開檔編碼重新讀取工作檔
+- (BOOL)reloadWithPreferredEncoding:(int)resource {
+    if (!self.fileURL || IsImage(self.fileURL)) return NO;
+    NSData *raw = [NSData dataWithContentsOfURL:self.fileURL];
+    if (!raw || ![self applyPreferredEncoding:resource raw:raw]) return NO;
+    [self updateChangeCount:NSChangeCleared];
+    return YES;
+}
+
+- (void)loadCloudCiphertext:(NSData *)cipher {
+    _imageOriginal = nil;
+    [self applyLoadedText:cipher encoding:N2EncodingUTF8];   // EXES 明文固定是 UTF-8
 }
 
 - (BOOL)loadRawData:(NSData *)raw imageURL:(NSURL *)imageURL error:(NSError **)error {
@@ -190,8 +226,9 @@ static NSError *ImageError(NSString *msg, const std::string &detail) {
     }
     NSData *raw = [NSData dataWithContentsOfURL:self.fileURL options:0 error:error];
     if (!raw) return NO;
-    N2Encoding enc = encoding;
-    NSData *utf8 = N2DecodeToUTF8(raw, &enc, NO);
+    BOOL autodetect = encoding < 0;   // 負值：自動偵測編碼
+    N2Encoding enc = autodetect ? N2EncodingUTF8 : encoding;
+    NSData *utf8 = N2DecodeToUTF8(raw, &enc, autodetect);
     if (!utf8) {
         if (error) *error = [NSError errorWithDomain:@"Notepad2XS" code:2 userInfo:@{
             NSLocalizedDescriptionKey: [NSString stringWithFormat:@"無法用「%@」解讀這個檔案。", N2EncodingDisplayName(encoding)]
@@ -358,6 +395,12 @@ static N2CryptoAlgorithm ForcedAlgorithm(NSURL *url) {
 
 - (void)saveToURL:(NSURL *)url ofType:(NSString *)typeName forSaveOperation:(NSSaveOperationType)op
 completionHandler:(void (^)(NSError *))handler {
+    // 雲端文件的本機副本只能存成 .x60（內容仍以 EXES 加密）
+    if (self.cloud && (op == NSSaveAsOperation || op == NSSaveToOperation) &&
+        ![url.pathExtension.lowercaseString isEqualToString:@"x60"]) {
+        handler(CryptoError(N2L(@"請使用 .x60 副檔名儲存雲端文件的本機副本。"), nil));
+        return;
+    }
     if (op == NSAutosaveElsewhereOperation || op == NSAutosaveInPlaceOperation || op == NSAutosaveAsOperation) {
         // 加密相關文件不做自動儲存（避免明文落地）
         if (_cryptoState != N2CryptoPlain || ForcedAlgorithm(url) != N2CryptoNone) { handler(nil); return; }
@@ -378,15 +421,36 @@ completionHandler:(void (^)(NSError *))handler {
             self->_saveSnapshot = nil;
             [self.editor updateCryptoAppearance];
             // 存檔成功：書籤一併寫入 .2xs（另存新檔把目前的書籤帶到新文件）
-            if (!e && (op == NSSaveOperation || op == NSSaveAsOperation))
+            if (!e && op == NSSaveAsOperation && self.cloud) {
+                self.cloud = nil;   // 另存到本機後就是一般 .x60 檔案
+                for (NSWindowController *wc in self.windowControllers) [wc synchronizeWindowTitleWithDocumentName];
+            }
+            if (!e && (op == NSSaveOperation || op == NSSaveAsOperation)) {
                 [self.editor saveBookmarks:newTarget ? N2BookmarkSaveNewTarget : N2BookmarkSaveSavedFile];
+                [self.editor fileEncodingSaved];   // 以不同編碼存檔：清除指定的開檔編碼
+            }
             handler(e);
         }];
     }];
 }
 
+// 雲端文件：⌘S 與關閉時的「儲存」都改成存回雲端
+- (void)saveDocumentWithDelegate:(id)delegate didSaveSelector:(SEL)selector contextInfo:(void *)contextInfo {
+    if (!self.cloud) { [super saveDocumentWithDelegate:delegate didSaveSelector:selector contextInfo:contextInfo]; return; }
+    if (!self.editor) {
+        if (delegate && selector)
+            ((void (*)(id, SEL, NSDocument *, BOOL, void *))objc_msgSend)(delegate, selector, self, NO, contextInfo);
+        return;
+    }
+    [self.editor saveCloudDocument:^(BOOL ok) {
+        if (delegate && selector)
+            ((void (*)(id, SEL, NSDocument *, BOOL, void *))objc_msgSend)(delegate, selector, self, ok, contextInfo);
+    }];
+}
+
 // 文件沒有修改、只增刪了書籤時按 ⌘S：只更新 .2xs，不重寫文件（與 Windows 版相同）
 - (IBAction)saveDocument:(id)sender {
+    if (self.cloud) { [self.editor saveCloudDocument:nil]; return; }
     if (!self.isDocumentEdited && self.fileURL && [NSFileManager.defaultManager fileExistsAtPath:self.fileURL.path] &&
         [self.editor saveBookmarks:N2BookmarkSaveChanged])
         return;
@@ -400,12 +464,20 @@ completionHandler:(void (^)(NSError *))handler {
 }
 
 - (NSString *)displayName {
+    if (self.cloud) return self.cloud.title;
     if (self.archiveLink && [self.fileURL.path isEqualToString:self.archiveLink.workURL.path])
         return [NSString stringWithFormat:@"%@（%@）", self.archiveLink.memberPath, self.archiveLink.archiveURL.lastPathComponent];
     return [super displayName];
 }
 
 - (void)close {
+    if (_closing) { [super close]; return; }
+    _closing = YES;
+    // R156：先保存書籤（壓縮檔成員的連結、加密狀態在下面會被清除）
+    [self.editor finalizeDocumentState];
+    N2RememberClosedDocument(self);   // R158：重新開啟關閉的分頁
+    // 之後關閉視窗時不再保存雲端設定（加密狀態清除後，鎖定中的密文畫面會被誤當成可保存的狀態）
+    self.cloud = nil;
     [self.archiveLink cleanup];
     self.archiveLink = nil;
     [self clearCrypto];

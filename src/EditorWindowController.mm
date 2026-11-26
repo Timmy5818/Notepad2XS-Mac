@@ -82,6 +82,7 @@ static const CGFloat kStatusBarHeight = 22;
     if ((self = [super initWithWindow:win])) {
         win.delegate = self;
         _bookmarks = [N2BookmarkContext new];
+        [self installFilePreferenceHook];
         self.shouldCascadeWindows = YES;
         [self buildViews];
         [self setupToolbar];
@@ -297,7 +298,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
 - (void)applyViewSettings:(ScintillaView *)v restyle:(BOOL)restyle {
     NSString *lang = self.doc ? self.doc.effectiveLanguageID : @"text";
     if (restyle) N2SyntaxApply(v, lang, N2Settings.fontName, N2Settings.fontSize, N2Settings.invertColors);
-    S(v, SCI_SETWRAPMODE, N2Settings.wordWrap ? SC_WRAP_WORD : SC_WRAP_NONE);
+    S(v, SCI_SETWRAPMODE, self.effectiveWordWrap ? SC_WRAP_WORD : SC_WRAP_NONE);
     S(v, SCI_SETWRAPVISUALFLAGS, N2Settings.wrapSymbols ? SC_WRAPVISUALFLAG_END : SC_WRAPVISUALFLAG_NONE);
     S(v, SCI_SETTABWIDTH, N2Settings.tabWidth);
     S(v, SCI_SETINDENT, 0);
@@ -593,6 +594,7 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
 - (IBAction)selectLanguage:(NSMenuItem *)sender {
     NSArray *ids = N2SyntaxLanguageIDs();
     self.doc.languageID = (sender.tag >= 0 && sender.tag < (NSInteger)ids.count) ? ids[sender.tag] : nil;
+    [self rememberSelectedLanguage];   // R155：記住這個檔案的語法
     [self applyLanguage];
 }
 
@@ -628,12 +630,23 @@ static sptr_t S(ScintillaView *v, unsigned int msg, uptr_t w = 0, sptr_t l = 0) 
 
 - (IBAction)reopenWithEncoding:(NSMenuItem *)sender {
     Document *doc = self.doc;
-    if (!doc.fileURL) { NSBeep(); return; }
     N2Encoding enc = (N2Encoding)sender.tag;
+    if (doc.cloud && !doc.isCryptoLocked) {
+        // 雲端文件：EXES 明文固定是 UTF-8，只記住選擇的編碼
+        [self rememberReadEncoding:enc];
+        doc.encoding = enc;
+        [self updateStatus];
+        return;
+    }
+    if (!doc.fileURL) { NSBeep(); return; }
     void (^reload)(void) = ^{
+        [self saveBookmarks:N2BookmarkSaveViewOnly];
         NSError *err = nil;
-        if (![doc reloadWithEncoding:enc error:&err] && err)
-            [self presentError:err modalForWindow:self.window delegate:nil didPresentSelector:nil contextInfo:NULL];
+        if (![doc reloadWithEncoding:enc error:&err]) {
+            if (err) [self presentError:err modalForWindow:self.window delegate:nil didPresentSelector:nil contextInfo:NULL];
+            return;
+        }
+        [self rememberReadEncoding:enc];   // R155：成功重新載入後才記住
     };
     if (!doc.isDocumentEdited) { reload(); return; }
     NSAlert *a = [NSAlert new];
@@ -869,6 +882,11 @@ static int SciFlags(N2FindOptions o) {
     SEL a = item.action;
     Document *doc = self.doc;
     if (![self isActionAvailable:a]) return NO;
+    BOOL handled = NO;
+    BOOL filePref = [self validateFilePreferenceItem:item handled:&handled];
+    if (handled) return filePref;
+    BOOL cloud = [self validateCloudItem:item handled:&handled];
+    if (handled) return cloud;
     struct { SEL sel; BOOL on; } toggles[] = {
         {@selector(toggleWordWrap:), N2Settings.wordWrap},
         {@selector(toggleLineNumbers:), N2Settings.showLineNumbers},
@@ -898,7 +916,7 @@ static int SciFlags(N2FindOptions o) {
 
     if (a == @selector(setLineEnding:)) item.state = (doc.eolMode == item.tag);
     else if (a == @selector(setSaveEncoding:)) item.state = (doc.encoding == item.tag);
-    else if (a == @selector(reopenWithEncoding:)) return doc.fileURL != nil && !doc.isImageDocument;
+    else if (a == @selector(reopenWithEncoding:)) return (doc.fileURL != nil && !doc.isImageDocument) || (doc.cloud && !doc.isCryptoLocked);
     else if (a == @selector(selectLanguage:)) {
         NSArray *ids = N2SyntaxLanguageIDs();
         if (item.tag < 0) item.state = (doc.languageID == nil);
@@ -922,7 +940,8 @@ static int SciFlags(N2FindOptions o) {
 
 // 切換分頁、關閉、結束程式時記錄檢視狀態（只有變動時才寫入 .2xs）
 - (void)windowDidResignMain:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
-- (void)windowWillClose:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
-- (void)appWillTerminate:(NSNotification *)n { if (self.document) [self saveBookmarks:N2BookmarkSaveViewOnly]; }
+// R156：關閉分頁或結束程式時保存書籤（文件沒有未儲存的修改時）
+- (void)windowWillClose:(NSNotification *)n { [self finalizeDocumentState]; }
+- (void)appWillTerminate:(NSNotification *)n { [self finalizeDocumentState]; }
 
 @end

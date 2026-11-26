@@ -21,3 +21,9 @@ NSArray<NSString *> *N2SyntaxBlockComment(NSString *langID);   // @[開始, 結�
 
 // 「醒目提示相同文字」用的指示器編號
 enum { N2IndicatorSameText = 8 };
+
+// 個別檔案語法設定（R155）與 Windows 版語法資源 ID（63000 起）互換，兩邊的 .2xs 可以共用
+// Mac 獨有的語言對應到最接近的 Windows 語法（例如 TypeScript → JavaScript）
+int N2SyntaxResourceForLanguage(NSString *langID);
+// resource 找不到對應時回傳 nil；同一個資源對應多種語言時，優先選與檔名相符的語言
+NSString *N2LanguageForSyntaxResource(int resource, NSString *fileName);

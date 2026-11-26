@@ -38,6 +38,32 @@
   "ru": "Расшифровать AES…",
   "zh-Hans": "AES 解密…"
  },
+ "API 版本": {
+  "en": "API version",
+  "ja": "API バージョン",
+  "zh-Hans": "API 版本",
+  "ko": "API 버전",
+  "fr": "Version de l’API",
+  "de": "API-Version",
+  "ru": "Версия API",
+  "es": "Versión de la API",
+  "pt-BR": "Versão da API",
+  "it": "Versione API",
+  "pl": "Wersja API"
+ },
+ "API 路徑": {
+  "en": "API path",
+  "ja": "API パス",
+  "zh-Hans": "API 路径",
+  "ko": "API 경로",
+  "fr": "Chemin de l’API",
+  "de": "API-Pfad",
+  "ru": "Путь к API",
+  "es": "Ruta de la API",
+  "pt-BR": "Caminho da API",
+  "it": "Percorso API",
+  "pl": "Ścieżka API"
+ },
  "Base64 編碼": {
   "de": "Base64-Kodierung",
   "en": "Base64 Encode",
@@ -285,6 +311,19 @@
   "ru": "Windows (CRLF)",
   "zh-Hans": "Windows（CRLF）"
  },
+ "X60 檔案": {
+  "en": "X60 file",
+  "ja": "X60 ファイル",
+  "zh-Hans": "X60 文件",
+  "ko": "X60 파일",
+  "fr": "Fichier X60",
+  "de": "X60-Datei",
+  "ru": "Файл X60",
+  "es": "Archivo X60",
+  "pt-BR": "Arquivo X60",
+  "it": "File X60",
+  "pl": "Plik X60"
+ },
  "　　選取 %ld 字元／%ld 行": {
   "de": "    Ausw. %ld Zeichen / %ld Zeilen",
   "en": "    Sel %ld chars / %ld lines",
@@ -350,6 +389,19 @@
   "ru": "Предыдущая закладка",
   "zh-Hans": "上一个书签"
  },
+ "上一層": {
+  "en": "Up one level",
+  "ja": "上へ",
+  "zh-Hans": "上一级",
+  "ko": "상위 폴더",
+  "fr": "Dossier parent",
+  "de": "Eine Ebene höher",
+  "ru": "На уровень выше",
+  "es": "Subir un nivel",
+  "pt-BR": "Subir um nível",
+  "it": "Cartella superiore",
+  "pl": "Poziom wyżej"
+ },
  "上下分割": {
   "de": "Horizontal teilen",
   "en": "Split Horizontally",
@@ -362,6 +414,32 @@
   "pt-BR": "Dividir horizontalmente",
   "ru": "Разделить по горизонтали",
   "zh-Hans": "上下拆分"
+ },
+ "上傳": {
+  "en": "Upload",
+  "ja": "アップロード",
+  "zh-Hans": "上传",
+  "ko": "업로드",
+  "fr": "Téléverser",
+  "de": "Hochladen",
+  "ru": "Загрузить",
+  "es": "Subir",
+  "pt-BR": "Enviar",
+  "it": "Carica",
+  "pl": "Prześlij"
+ },
+ "上傳結果": {
+  "en": "Upload results",
+  "ja": "アップロード結果",
+  "zh-Hans": "上传结果",
+  "ko": "업로드 결과",
+  "fr": "Résultats de l’envoi",
+  "de": "Upload-Ergebnisse",
+  "ru": "Результаты загрузки",
+  "es": "Resultados de carga",
+  "pt-BR": "Resultados do envio",
+  "it": "Risultati del caricamento",
+  "pl": "Wyniki przesyłania"
  },
  "上移": {
   "de": "Nach oben",
@@ -518,6 +596,45 @@
   "pt-BR": "Preencher com espaços",
   "ru": "Дополнить пробелами",
   "zh-Hans": "以空格补齐"
+ },
+ "以自動偵測編碼重新載入": {
+  "en": "Reload with automatic encoding detection",
+  "ja": "エンコードを自動判定して再読み込み",
+  "zh-Hans": "以自动检测的编码重新加载",
+  "ko": "인코딩을 자동 감지하여 다시 불러오기",
+  "fr": "Recharger avec détection automatique de l’encodage",
+  "de": "Mit automatischer Kodierungserkennung neu laden",
+  "ru": "Перезагрузить с автоопределением кодировки",
+  "es": "Recargar con detección automática de codificación",
+  "pt-BR": "Recarregar com detecção automática de codificação",
+  "it": "Ricarica rilevando automaticamente la codifica",
+  "pl": "Wczytaj ponownie z automatycznym wykrywaniem kodowania"
+ },
+ "伺服器回應有誤或未完成操作。": {
+  "en": "The server response was invalid or the operation failed.",
+  "ja": "サーバーの応答が無効か、操作に失敗しました。",
+  "zh-Hans": "服务器响应无效或操作失败。",
+  "ko": "서버 응답이 잘못되었거나 작업에 실패했습니다.",
+  "fr": "Réponse du serveur incorrecte ou opération échouée.",
+  "de": "Ungültige Serverantwort oder Vorgang fehlgeschlagen.",
+  "ru": "Некорректный ответ сервера или сбой операции.",
+  "es": "Respuesta no válida del servidor o error de operación.",
+  "pt-BR": "Resposta inválida do servidor ou falha na operação.",
+  "it": "Risposta del server non valida o operazione non riuscita.",
+  "pl": "Nieprawidłowa odpowiedź serwera lub błąd operacji."
+ },
+ "伺服器拒絕存取。請檢查來源 IP 白名單。": {
+  "en": "Access denied. Check the server's IP allowlist.",
+  "ja": "アクセスが拒否されました。サーバーの許可 IP を確認してください。",
+  "zh-Hans": "服务器拒绝访问，请检查来源 IP 白名单。",
+  "ko": "접근이 거부되었습니다. 서버의 IP 허용 목록을 확인하세요.",
+  "fr": "Accès refusé. Vérifiez la liste des IP autorisées.",
+  "de": "Zugriff verweigert. Prüfen Sie die IP-Freigabeliste.",
+  "ru": "Доступ запрещён. Проверьте список разрешённых IP.",
+  "es": "Acceso denegado. Revise las IP permitidas.",
+  "pt-BR": "Acesso negado. Verifique a lista de IPs permitidos.",
+  "it": "Accesso negato. Controlla gli IP consentiti.",
+  "pl": "Odmowa dostępu. Sprawdź listę dozwolonych adresów IP."
  },
  "使用選取的文字尋找": {
   "de": "Auswahl suchen",
@@ -714,6 +831,19 @@
   "ru": "Показать все",
   "zh-Hans": "全部显示"
  },
+ "共 %lu 個項目": {
+  "en": "%lu items",
+  "ja": "%lu 項目",
+  "zh-Hans": "共 %lu 个项目",
+  "ko": "%lu개 항목",
+  "fr": "%lu éléments",
+  "de": "%lu Objekte",
+  "ru": "Объектов: %lu",
+  "es": "%lu elementos",
+  "pt-BR": "%lu itens",
+  "it": "%lu elementi",
+  "pl": "Elementy: %lu"
+ },
  "其他資料夾…": {
   "de": "Anderer Ordner…",
   "en": "Other Folder…",
@@ -870,6 +1000,19 @@
   "ru": "Удалить строку",
   "zh-Hans": "删除当前行"
  },
+ "刪除資料夾…": {
+  "en": "Delete folder…",
+  "ja": "フォルダーを削除…",
+  "zh-Hans": "删除文件夹…",
+  "ko": "폴더 삭제…",
+  "fr": "Supprimer le dossier…",
+  "de": "Ordner löschen…",
+  "ru": "Удалить папку…",
+  "es": "Eliminar carpeta…",
+  "pt-BR": "Excluir pasta…",
+  "it": "Elimina cartella…",
+  "pl": "Usuń folder…"
+ },
  "到結尾後從頭找": {
   "de": "Am Ende fortsetzen",
   "en": "Wrap Around",
@@ -908,6 +1051,32 @@
   "pt-BR": "Recortar linha atual",
   "ru": "Вырезать строку",
   "zh-Hans": "剪切当前行"
+ },
+ "副檔名": {
+  "en": "Extension",
+  "ja": "拡張子",
+  "zh-Hans": "扩展名",
+  "ko": "확장명",
+  "fr": "Extension",
+  "de": "Dateierweiterung",
+  "ru": "Расширение",
+  "es": "Extensión",
+  "pt-BR": "Extensão",
+  "it": "Estensione",
+  "pl": "Rozszerzenie"
+ },
+ "加密中": {
+  "en": "encrypting",
+  "ja": "暗号化中",
+  "zh-Hans": "加密中",
+  "ko": "암호화 중",
+  "fr": "chiffrement",
+  "de": "wird verschlüsselt",
+  "ru": "шифрование",
+  "es": "cifrando",
+  "pt-BR": "criptografando",
+  "it": "crittografia in corso",
+  "pl": "szyfrowanie"
  },
  "加解密": {
   "de": "Verschlüsselung",
@@ -1169,6 +1338,19 @@
   "ru": "Включить локальную историю версий (резервная копия перед сохранением)",
   "zh-Hans": "启用本机版本历史（保存时先备份被覆盖的旧文件）"
  },
+ "單檔上傳上限": {
+  "en": "Upload limit per file",
+  "ja": "ファイルごとの上限",
+  "zh-Hans": "单个文件上传上限",
+  "ko": "파일당 업로드 한도",
+  "fr": "Limite par fichier",
+  "de": "Upload-Limit pro Datei",
+  "ru": "Лимит на файл",
+  "es": "Límite por archivo",
+  "pt-BR": "Limite por arquivo",
+  "it": "Limite per file",
+  "pl": "Limit na plik"
+ },
  "回復到已儲存": {
   "de": "Zurück zur gesicherten Version",
   "en": "Revert to Saved",
@@ -1181,6 +1363,19 @@
   "pt-BR": "Reverter para a Versão Salva",
   "ru": "Вернуться к сохраненному",
   "zh-Hans": "恢复到已保存"
+ },
+ "圖示": {
+  "en": "Icons",
+  "ja": "アイコン",
+  "zh-Hans": "图标",
+  "ko": "아이콘",
+  "fr": "Icônes",
+  "de": "Symbole",
+  "ru": "Значки",
+  "es": "Iconos",
+  "pt-BR": "Ícones",
+  "it": "Icone",
+  "pl": "Ikony"
  },
  "在 Finder 中顯示": {
   "de": "Im Finder zeigen",
@@ -1338,6 +1533,19 @@
   "ru": "Сжать пробелы",
   "zh-Hans": "压缩空白字符"
  },
+ "大小": {
+  "en": "Size",
+  "ja": "サイズ",
+  "zh-Hans": "大小",
+  "ko": "크기",
+  "fr": "Taille",
+  "de": "Größe",
+  "ru": "Размер",
+  "es": "Tamaño",
+  "pt-BR": "Tamanho",
+  "it": "Dimensione",
+  "pl": "Rozmiar"
+ },
  "大小寫": {
   "de": "Groß-/Kleinschreibung",
   "en": "Case",
@@ -1376,6 +1584,19 @@
   "pt-BR": "Estrutura",
   "ru": "Структура",
   "zh-Hans": "大纲"
+ },
+ "失敗": {
+  "en": "Failed",
+  "ja": "失敗",
+  "zh-Hans": "失败",
+  "ko": "실패",
+  "fr": "Échecs",
+  "de": "Fehlgeschlagen",
+  "ru": "Ошибок",
+  "es": "Fallidos",
+  "pt-BR": "Falhas",
+  "it": "Non riusciti",
+  "pl": "Błędy"
  },
  "字串轉為十六進位": {
   "de": "Text in Hex",
@@ -1455,6 +1676,19 @@
   "ru": "Размер",
   "zh-Hans": "字号"
  },
+ "存到雲端…": {
+  "en": "Save to Cloud…",
+  "ja": "クラウドに保存…",
+  "zh-Hans": "保存到云端…",
+  "ko": "클라우드에 저장…",
+  "fr": "Enregistrer dans le cloud…",
+  "de": "In der Cloud speichern…",
+  "ru": "Сохранить в облаке…",
+  "es": "Guardar en la nube…",
+  "pt-BR": "Salvar na nuvem…",
+  "it": "Salva nel cloud…",
+  "pl": "Zapisz w chmurze…"
+ },
  "安全刪除目前檔案…": {
   "de": "Aktuelle Datei sicher löschen…",
   "en": "Securely Delete Current File…",
@@ -1506,6 +1740,19 @@
   "pt-BR": "Tamanho Real",
   "ru": "Фактический размер",
   "zh-Hans": "实际大小"
+ },
+ "將以自動偵測的編碼重新讀取檔案，目前的修改會遺失。": {
+  "en": "The file will be reloaded with automatically detected encoding, and current changes will be lost.",
+  "ja": "自動検出したエンコードでファイルを再読み込みします。現在の変更は失われます。",
+  "zh-Hans": "将以自动检测的编码重新读取文件，当前的修改会丢失。",
+  "ko": "자동 감지된 인코딩으로 파일을 다시 읽습니다. 현재 변경 내용은 사라집니다.",
+  "fr": "Le fichier sera rechargé avec l’encodage détecté automatiquement ; les modifications en cours seront perdues.",
+  "de": "Die Datei wird mit automatisch erkannter Kodierung neu geladen; aktuelle Änderungen gehen verloren.",
+  "ru": "Файл будет заново прочитан с автоматически определённой кодировкой, текущие изменения будут потеряны.",
+  "es": "El archivo se volverá a leer con la codificación detectada automáticamente y se perderán los cambios actuales.",
+  "pt-BR": "O arquivo será recarregado com a codificação detectada automaticamente e as alterações atuais serão perdidas.",
+  "it": "Il file verrà ricaricato con la codifica rilevata automaticamente e le modifiche attuali andranno perse.",
+  "pl": "Plik zostanie ponownie wczytany z automatycznie wykrytym kodowaniem, bieżące zmiany zostaną utracone."
  },
  "將分頁移至新視窗": {
   "de": "Tab in neues Fenster bewegen",
@@ -1663,6 +1910,19 @@
   "ru": "Развернуть все блоки",
   "zh-Hans": "展开所有区块"
  },
+ "屬性": {
+  "en": "Properties",
+  "ja": "プロパティ",
+  "zh-Hans": "属性",
+  "ko": "속성",
+  "fr": "Propriétés",
+  "de": "Eigenschaften",
+  "ru": "Свойства",
+  "es": "Propiedades",
+  "pt-BR": "Propriedades",
+  "it": "Proprietà",
+  "pl": "Właściwości"
+ },
  "工具": {
   "de": "Werkzeuge",
   "en": "Tools",
@@ -1715,6 +1975,19 @@
   "ru": "По ширине",
   "zh-Hans": "两端对齐"
  },
+ "已上傳": {
+  "en": "Uploaded",
+  "ja": "完了",
+  "zh-Hans": "已上传",
+  "ko": "업로드 완료",
+  "fr": "Envoyés",
+  "de": "Hochgeladen",
+  "ru": "Загружено",
+  "es": "Cargados",
+  "pt-BR": "Enviados",
+  "it": "Caricati",
+  "pl": "Przesłano"
+ },
  "已取代 %ld 處": {
   "de": "%ld Treffer ersetzt",
   "en": "Replaced %ld occurrences",
@@ -1740,6 +2013,45 @@
   "pt-BR": "Busca reiniciada do outro lado",
   "ru": "Поиск продолжен с другого конца",
   "zh-Hans": "已从另一端继续查找"
+ },
+ "已跳過": {
+  "en": "Skipped",
+  "ja": "スキップ済み",
+  "zh-Hans": "已跳过",
+  "ko": "건너뜀",
+  "fr": "Ignorés",
+  "de": "Übersprungen",
+  "ru": "Пропущено",
+  "es": "Omitidos",
+  "pt-BR": "Ignorados",
+  "it": "Saltati",
+  "pl": "Pominięto"
+ },
+ "已連線至 Notepad2XS 雲端 API。": {
+  "en": "Connected to the Notepad2XS cloud API.",
+  "ja": "Notepad2XS クラウド API に接続しました。",
+  "zh-Hans": "已连接到 Notepad2XS 云端 API。",
+  "ko": "Notepad2XS 클라우드 API에 연결했습니다.",
+  "fr": "Connexion à l’API cloud Notepad2XS établie.",
+  "de": "Mit der Notepad2XS-Cloud-API verbunden.",
+  "ru": "Подключение к API Notepad2XS установлено.",
+  "es": "Conexión con la API de Notepad2XS establecida.",
+  "pt-BR": "Conectado à API de nuvem do Notepad2XS.",
+  "it": "Connessione all’API cloud Notepad2XS riuscita.",
+  "pl": "Połączono z API chmury Notepad2XS."
+ },
+ "已達到資料夾數量或層級上限。": {
+  "en": "The folder count or depth limit was reached.",
+  "ja": "フォルダーの数または階層の上限に達しました。",
+  "zh-Hans": "已达到文件夹数量或层级上限。",
+  "ko": "폴더 수 또는 깊이 한도에 도달했습니다.",
+  "fr": "Limite de nombre ou de profondeur des dossiers atteinte.",
+  "de": "Die Anzahl oder Tiefe der Ordner hat das Limit erreicht.",
+  "ru": "Достигнут предел количества или вложенности папок.",
+  "es": "Se alcanzó el límite de cantidad o profundidad de carpetas.",
+  "pt-BR": "O limite de quantidade ou níveis de pastas foi atingido.",
+  "it": "Raggiunto il limite di numero o profondità delle cartelle.",
+  "pl": "Osiągnięto limit liczby lub zagnieżdżenia folderów."
  },
  "已鎖定的加密文件要先解密。": {
   "de": "Entschlüsseln Sie zuerst das gesperrte verschlüsselte Dokument.",
@@ -1871,6 +2183,32 @@
   "ru": "«%@» не найдено",
   "zh-Hans": "找不到“%@”"
  },
+ "找不到指定的雲端檔案或 API。": {
+  "en": "The cloud file or API was not found.",
+  "ja": "クラウドファイルまたは API が見つかりません。",
+  "zh-Hans": "找不到指定的云端文件或 API。",
+  "ko": "클라우드 파일 또는 API를 찾을 수 없습니다.",
+  "fr": "Fichier cloud ou API introuvable.",
+  "de": "Cloud-Datei oder API nicht gefunden.",
+  "ru": "Облачный файл или API не найден.",
+  "es": "No se encontró el archivo en la nube o la API.",
+  "pt-BR": "Arquivo na nuvem ou API não encontrado.",
+  "it": "File cloud o API non trovato.",
+  "pl": "Nie znaleziono pliku w chmurze lub API."
+ },
+ "找不到資料夾。請重新整理清單。": {
+  "en": "Folder not found. Refresh the list.",
+  "ja": "フォルダーが見つかりません。一覧を更新してください。",
+  "zh-Hans": "找不到文件夹。请刷新列表。",
+  "ko": "폴더를 찾을 수 없습니다. 목록을 새로 고치세요.",
+  "fr": "Dossier introuvable. Actualisez la liste.",
+  "de": "Ordner nicht gefunden. Aktualisieren Sie die Liste.",
+  "ru": "Папка не найдена. Обновите список.",
+  "es": "No se encuentra la carpeta. Actualiza la lista.",
+  "pt-BR": "Pasta não encontrada. Atualize a lista.",
+  "it": "Cartella non trovata. Aggiorna l’elenco.",
+  "pl": "Nie znaleziono folderu. Odśwież listę."
+ },
  "折疊／展開目前區塊": {
   "de": "Aktuellen Block ein- oder ausklappen",
   "en": "Toggle current fold",
@@ -1922,6 +2260,19 @@
   "pt-BR": "Modelos de instruções…",
   "ru": "Шаблоны запросов…",
   "zh-Hans": "指令模板…"
+ },
+ "排序方式": {
+  "en": "Sort by",
+  "ja": "並べ替え",
+  "zh-Hans": "排序方式",
+  "ko": "정렬 기준",
+  "fr": "Trier par",
+  "de": "Sortieren nach",
+  "ru": "Сортировка",
+  "es": "Ordenar por",
+  "pt-BR": "Classificar por",
+  "it": "Ordina per",
+  "pl": "Sortuj według"
  },
  "排序／移除重複行…": {
   "de": "Sortieren / Duplikate entfernen…",
@@ -2053,6 +2404,19 @@
   "ru": "Строки и абзацы",
   "zh-Hans": "换行与段落"
  },
+ "搜尋所有資料夾": {
+  "en": "Search all folders",
+  "ja": "すべてのフォルダーを検索",
+  "zh-Hans": "搜索所有文件夹",
+  "ko": "모든 폴더 검색",
+  "fr": "Chercher dans tous les dossiers",
+  "de": "Alle Ordner durchsuchen",
+  "ru": "Искать во всех папках",
+  "es": "Buscar en todas las carpetas",
+  "pt-BR": "Buscar em todas as pastas",
+  "it": "Cerca in tutte le cartelle",
+  "pl": "Szukaj we wszystkich folderach"
+ },
  "搜尋書籤已更新：%d 行。": {
   "de": "Suchlesezeichen aktualisiert: %d Zeilen.",
   "en": "Search bookmarks updated: %d lines.",
@@ -2066,6 +2430,19 @@
   "ru": "Закладки поиска обновлены: %d строк.",
   "zh-Hans": "搜索书签已更新：%d 行。"
  },
+ "搜尋檔名": {
+  "en": "Find file names",
+  "ja": "ファイル名検索",
+  "zh-Hans": "搜索文件名",
+  "ko": "파일 이름 검색",
+  "fr": "Chercher un nom",
+  "de": "Dateinamen suchen",
+  "ru": "Поиск по имени",
+  "es": "Buscar por nombre",
+  "pt-BR": "Buscar por nome",
+  "it": "Cerca per nome",
+  "pl": "Znajdź nazwę"
+ },
  "搜尋檔案…": {
   "de": "Dateien suchen…",
   "en": "Find Files…",
@@ -2078,6 +2455,45 @@
   "pt-BR": "Buscar arquivos…",
   "ru": "Поиск файлов…",
   "zh-Hans": "搜索文件…"
+ },
+ "搬移到…": {
+  "en": "Move to…",
+  "ja": "移動先…",
+  "zh-Hans": "移动到…",
+  "ko": "이동 위치…",
+  "fr": "Déplacer vers…",
+  "de": "Verschieben nach…",
+  "ru": "Переместить в…",
+  "es": "Mover a…",
+  "pt-BR": "Mover para…",
+  "it": "Sposta in…",
+  "pl": "Przenieś do…"
+ },
+ "搬移檔案…": {
+  "en": "Move file…",
+  "ja": "ファイルを移動…",
+  "zh-Hans": "移动文件…",
+  "ko": "파일 이동…",
+  "fr": "Déplacer le fichier…",
+  "de": "Datei verschieben…",
+  "ru": "Переместить файл…",
+  "es": "Mover archivo…",
+  "pt-BR": "Mover arquivo…",
+  "it": "Sposta file…",
+  "pl": "Przenieś plik…"
+ },
+ "搬移資料夾到…": {
+  "en": "Move folder to…",
+  "ja": "フォルダーの移動先…",
+  "zh-Hans": "移动文件夹到…",
+  "ko": "폴더 이동 위치…",
+  "fr": "Déplacer le dossier vers…",
+  "de": "Ordner verschieben nach…",
+  "ru": "Переместить папку в…",
+  "es": "Mover carpeta a…",
+  "pt-BR": "Mover pasta para…",
+  "it": "Sposta cartella in…",
+  "pl": "Przenieś folder do…"
  },
  "放大": {
   "de": "Vergrößern",
@@ -2222,6 +2638,19 @@
   "ru": "Добавить строку",
   "zh-Hans": "新增行"
  },
+ "新增子資料夾…": {
+  "en": "New subfolder…",
+  "ja": "サブフォルダーを作成…",
+  "zh-Hans": "新建子文件夹…",
+  "ko": "새 하위 폴더…",
+  "fr": "Nouveau sous-dossier…",
+  "de": "Neuer Unterordner…",
+  "ru": "Новая подпапка…",
+  "es": "Nueva subcarpeta…",
+  "pt-BR": "Nova subpasta…",
+  "it": "Nuova sottocartella…",
+  "pl": "Nowy podfolder…"
+ },
  "新增欄": {
   "de": "Spalte anhängen",
   "en": "Append column",
@@ -2234,6 +2663,19 @@
   "pt-BR": "Acrescentar coluna",
   "ru": "Добавить столбец",
   "zh-Hans": "新增列"
+ },
+ "新增資料夾…": {
+  "en": "New folder…",
+  "ja": "新規フォルダー…",
+  "zh-Hans": "新建文件夹…",
+  "ko": "새 폴더…",
+  "fr": "Nouveau dossier…",
+  "de": "Neuer Ordner…",
+  "ru": "Новая папка…",
+  "es": "Nueva carpeta…",
+  "pt-BR": "Nova pasta…",
+  "it": "Nuova cartella…",
+  "pl": "Nowy folder…"
  },
  "新文件換行：": {
   "de": "Zeilenenden neuer Dokumente:",
@@ -2287,6 +2729,32 @@
   "ru": "Дата/время (кратко)",
   "zh-Hans": "时间／日期（简短）"
  },
+ "更名": {
+  "en": "Rename",
+  "ja": "名前を変更",
+  "zh-Hans": "重命名",
+  "ko": "이름 바꾸기",
+  "fr": "Renommer",
+  "de": "Umbenennen",
+  "ru": "Переименовать",
+  "es": "Renombrar",
+  "pt-BR": "Renomear",
+  "it": "Rinomina",
+  "pl": "Zmień nazwę"
+ },
+ "更名資料夾…": {
+  "en": "Rename folder…",
+  "ja": "フォルダー名を変更…",
+  "zh-Hans": "重命名文件夹…",
+  "ko": "폴더 이름 변경…",
+  "fr": "Renommer le dossier…",
+  "de": "Ordner umbenennen…",
+  "ru": "Переименовать папку…",
+  "es": "Renombrar carpeta…",
+  "pt-BR": "Renomear pasta…",
+  "it": "Rinomina cartella…",
+  "pl": "Zmień nazwę folderu…"
+ },
  "最上層顯示": {
   "de": "Immer im Vordergrund",
   "en": "Always on Top",
@@ -2326,6 +2794,19 @@
   "ru": "Последняя вкладка",
   "zh-Hans": "最后一个标签页"
  },
+ "最後修改時間": {
+  "en": "Last modified",
+  "ja": "更新日時",
+  "zh-Hans": "最后修改时间",
+  "ko": "수정한 날짜",
+  "fr": "Dernière modification",
+  "de": "Zuletzt geändert",
+  "ru": "Дата изменения",
+  "es": "Última modificación",
+  "pt-BR": "Última modificação",
+  "it": "Ultima modifica",
+  "pl": "Ostatnia modyfikacja"
+ },
  "會先關閉所有文件，接著刪除本機設定、分頁還原紀錄、AES／EXES 預設密鑰設定，並清除所有人工智慧 API Key，然後結束程式。人工智慧自訂範本與提示歷史會保留。": {
   "de": "Zuerst werden alle Dokumente geschlossen. Dann werden lokale Einstellungen, der Tab-Wiederherstellungsverlauf und die AES/EXES-Standardschlüssel gelöscht, alle KI-API-Schlüssel entfernt und die App beendet. Eigene KI-Vorlagen und der Eingabeverlauf bleiben erhalten.",
   "en": "All documents will be closed first. Then local settings, the tab restore record and the AES/EXES default key settings will be deleted, all AI API keys will be cleared, and the app will quit. Custom AI templates and prompt history are kept.",
@@ -2351,6 +2832,19 @@
   "pt-BR": "Serviços",
   "ru": "Службы",
   "zh-Hans": "服务"
+ },
+ "根目錄": {
+  "en": "Root",
+  "ja": "ルート",
+  "zh-Hans": "根目录",
+  "ko": "루트",
+  "fr": "Racine",
+  "de": "Stammordner",
+  "ru": "Корень",
+  "es": "Raíz",
+  "pt-BR": "Raiz",
+  "it": "Radice",
+  "pl": "Katalog główny"
  },
  "格式": {
   "de": "Format",
@@ -2443,6 +2937,19 @@
   "ru": "Заголовок 3",
   "zh-Hans": "标题 3"
  },
+ "檔名": {
+  "en": "File name",
+  "ja": "ファイル名",
+  "zh-Hans": "文件名",
+  "ko": "파일 이름",
+  "fr": "Nom du fichier",
+  "de": "Dateiname",
+  "ru": "Имя файла",
+  "es": "Nombre del archivo",
+  "pt-BR": "Nome do arquivo",
+  "it": "Nome del file",
+  "pl": "Nazwa pliku"
+ },
  "檔案": {
   "de": "Ablage",
   "en": "File",
@@ -2455,6 +2962,19 @@
   "pt-BR": "Arquivo",
   "ru": "Файл",
   "zh-Hans": "文件"
+ },
+ "檔案內容不符合 X60 格式。": {
+  "en": "The file is not valid X60.",
+  "ja": "有効な X60 ファイルではありません。",
+  "zh-Hans": "文件内容不符合 X60 格式。",
+  "ko": "유효한 X60 파일이 아닙니다.",
+  "fr": "Le fichier n’est pas un X60 valide.",
+  "de": "Die Datei ist kein gültiges X60-Dokument.",
+  "ru": "Недопустимый формат X60.",
+  "es": "El archivo no es un X60 válido.",
+  "pt-BR": "O arquivo não é um X60 válido.",
+  "it": "Il file X60 non è valido.",
+  "pl": "Plik X60 jest nieprawidłowy."
  },
  "檔案名稱": {
   "de": "Dateiname",
@@ -2495,6 +3015,19 @@
   "ru": "Ни файл, ни его папка больше не существуют.",
   "zh-Hans": "文件与所在文件夹都已不存在。"
  },
+ "檔案超過可處理的大小。": {
+  "en": "The file exceeds the size limit.",
+  "ja": "ファイルがサイズ上限を超えています。",
+  "zh-Hans": "文件超过大小限制。",
+  "ko": "파일이 크기 제한을 초과했습니다.",
+  "fr": "Le fichier dépasse la taille maximale.",
+  "de": "Die Datei überschreitet die Größenbeschränkung.",
+  "ru": "Файл превышает допустимый размер.",
+  "es": "El archivo supera el tamaño máximo.",
+  "pt-BR": "O arquivo excede o tamanho máximo.",
+  "it": "Il file supera il limite di dimensione.",
+  "pl": "Plik przekracza limit rozmiaru."
+ },
  "檢視": {
   "de": "Darstellung",
   "en": "View",
@@ -2520,6 +3053,19 @@
   "pt-BR": "Colunas",
   "ru": "Столбцов",
   "zh-Hans": "列"
+ },
+ "欄位": {
+  "en": "Columns",
+  "ja": "列",
+  "zh-Hans": "列",
+  "ko": "열",
+  "fr": "Colonnes",
+  "de": "Spalten",
+  "ru": "Столбцы",
+  "es": "Columnas",
+  "pt-BR": "Colunas",
+  "it": "Colonne",
+  "pl": "Kolumny"
  },
  "正在準備排版畫布…": {
   "de": "Layoutfläche wird vorbereitet…",
@@ -2559,6 +3105,45 @@
   "pt-BR": "Expressão regular inválida",
   "ru": "Ошибка в регулярном выражении",
   "zh-Hans": "正则表达式有误"
+ },
+ "此檔案恢復自動判斷語法": {
+  "en": "Detect this file’s syntax automatically",
+  "ja": "このファイルの構文を自動判定",
+  "zh-Hans": "此文件恢复自动判断语法",
+  "ko": "이 파일의 구문 자동 감지",
+  "fr": "Détecter automatiquement la syntaxe de ce fichier",
+  "de": "Syntax dieser Datei automatisch erkennen",
+  "ru": "Автоопределение синтаксиса этого файла",
+  "es": "Detectar automáticamente la sintaxis de este archivo",
+  "pt-BR": "Detectar automaticamente a sintaxe deste arquivo",
+  "it": "Rileva automaticamente la sintassi di questo file",
+  "pl": "Wykrywaj automatycznie składnię tego pliku"
+ },
+ "此檔案恢復預設換行": {
+  "en": "Restore default wrapping for this file",
+  "ja": "このファイルの折り返しを既定に戻す",
+  "zh-Hans": "此文件恢复默认换行",
+  "ko": "이 파일의 기본 줄 바꿈 복원",
+  "fr": "Rétablir le retour à la ligne par défaut pour ce fichier",
+  "de": "Standardumbruch für diese Datei wiederherstellen",
+  "ru": "Восстановить исходный перенос строк для этого файла",
+  "es": "Restaurar el ajuste de líneas predeterminado para este archivo",
+  "pt-BR": "Restaurar a quebra de linha padrão neste arquivo",
+  "it": "Ripristina il ritorno a capo predefinito per questo file",
+  "pl": "Przywróć domyślne zawijanie wierszy dla tego pliku"
+ },
+ "此檔案自動換行": {
+  "en": "Word wrap for this file",
+  "ja": "このファイルを折り返す",
+  "zh-Hans": "此文件自动换行",
+  "ko": "이 파일의 자동 줄 바꿈",
+  "fr": "Retour à la ligne pour ce fichier",
+  "de": "Zeilenumbruch für diese Datei",
+  "ru": "Перенос строк в этом файле",
+  "es": "Ajustar líneas de este archivo",
+  "pt-BR": "Quebra de linha neste arquivo",
+  "it": "A capo automatico per questo file",
+  "pl": "Zawijaj wiersze w tym pliku"
  },
  "此處沒有可顯示的字元。": {
   "de": "An dieser Position steht kein Zeichen.",
@@ -2690,6 +3275,19 @@
   "ru": "Уменьшить отступ",
   "zh-Hans": "减少缩进"
  },
+ "測試連線": {
+  "en": "Test connection",
+  "ja": "接続テスト",
+  "zh-Hans": "测试连接",
+  "ko": "연결 테스트",
+  "fr": "Tester la connexion",
+  "de": "Verbindung testen",
+  "ru": "Проверить связь",
+  "es": "Probar conexión",
+  "pt-BR": "Testar conexão",
+  "it": "Prova connessione",
+  "pl": "Sprawdź połączenie"
+ },
  "灰色": {
   "de": "Grau",
   "en": "Gray",
@@ -2715,6 +3313,19 @@
   "pt-BR": "Não é possível decodificar este caractere com a codificação atual do documento.",
   "ru": "Не удаётся декодировать символ в текущей кодировке документа.",
   "zh-Hans": "无法用当前文档编码解读此字符。"
+ },
+ "無法儲存此檔案的個別設定。本次開啟期間仍會套用。": {
+  "en": "Could not save this file’s settings. They still apply while it is open.",
+  "ja": "ファイル個別の設定を保存できません。開いている間は設定が適用されます。",
+  "zh-Hans": "无法保存此文件的单独设置。文件打开期间仍会应用。",
+  "ko": "이 파일의 설정을 저장할 수 없습니다. 파일이 열려 있는 동안에는 설정이 적용됩니다.",
+  "fr": "Impossible d’enregistrer les paramètres de ce fichier. Ils restent actifs tant qu’il est ouvert.",
+  "de": "Die Dateieinstellungen konnten nicht gespeichert werden. Sie gelten, solange die Datei geöffnet ist.",
+  "ru": "Не удалось сохранить настройки файла. Они действуют, пока файл открыт.",
+  "es": "No se pudo guardar la configuración del archivo. Se aplica mientras el archivo esté abierto.",
+  "pt-BR": "Não foi possível salvar as configurações desse arquivo. Elas valem enquanto ele estiver aberto.",
+  "it": "Impossibile salvare le impostazioni del file. Rimangono attive finché il file è aperto.",
+  "pl": "Nie można zapisać ustawień pliku. Obowiązują, dopóki jest otwarty."
  },
  "無法安全辨識這份 HTML 的標籤結構，原文件未變更。請檢查 HTML。": {
   "de": "Die Tag-Struktur dieses HTML kann nicht sicher erkannt werden. Das Dokument wurde nicht geändert. Bitte prüfen Sie das HTML.",
@@ -2768,6 +3379,32 @@
   "ru": "Не удаётся создать холст вёрстки.",
   "zh-Hans": "无法创建排版画布。"
  },
+ "無法讀取本機檔案。": {
+  "en": "Could not read the local file.",
+  "ja": "ローカルファイルを読み込めません。",
+  "zh-Hans": "无法读取本地文件。",
+  "ko": "로컬 파일을 읽을 수 없습니다.",
+  "fr": "Impossible de lire le fichier local.",
+  "de": "Die lokale Datei konnte nicht gelesen werden.",
+  "ru": "Не удалось прочитать локальный файл.",
+  "es": "No se pudo leer el archivo local.",
+  "pt-BR": "Não foi possível ler o arquivo local.",
+  "it": "Impossibile leggere il file locale.",
+  "pl": "Nie udało się odczytać pliku lokalnego."
+ },
+ "無法讀取這份雲端檔案的逐檔設定。": {
+  "en": "Unable to load settings for this cloud file.",
+  "ja": "このクラウドファイルの設定を読み込めませんでした。",
+  "zh-Hans": "无法读取此云端文件的逐文件设置。",
+  "ko": "이 클라우드 파일의 설정을 불러올 수 없습니다.",
+  "fr": "Impossible de charger les réglages de ce fichier cloud.",
+  "de": "Die Einstellungen für diese Cloud-Datei konnten nicht geladen werden.",
+  "ru": "Не удалось загрузить настройки облачного файла.",
+  "es": "No se pudieron cargar los ajustes de este archivo en la nube.",
+  "pt-BR": "Não foi possível carregar os ajustes deste arquivo na nuvem.",
+  "it": "Impossibile caricare le impostazioni di questo file nel cloud.",
+  "pl": "Nie udało się wczytać ustawień tego pliku w chmurze."
+ },
  "無法開啟檔案路徑。": {
   "de": "Der Dateispeicherort kann nicht geöffnet werden.",
   "en": "Unable to open the file location.",
@@ -2807,6 +3444,45 @@
   "ru": "Строка состояния",
   "zh-Hans": "状态栏"
  },
+ "目的地已有同名檔案。請改名或選擇其他資料夾。": {
+  "en": "That name is taken. Change the name or choose another folder.",
+  "ja": "同名のファイルがあります。名前か移動先を変更してください。",
+  "zh-Hans": "目标位置已有同名文件。请改名或选择其他文件夹。",
+  "ko": "같은 이름의 파일이 있습니다. 이름이나 폴더를 바꾸세요.",
+  "fr": "Ce nom existe déjà. Changez le nom ou le dossier.",
+  "de": "Der Name ist vergeben. Ändern Sie den Namen oder den Ordner.",
+  "ru": "Имя занято. Измените имя или выберите другую папку.",
+  "es": "Ese nombre ya existe. Cámbialo o elige otra carpeta.",
+  "pt-BR": "Esse nome já existe. Altere o nome ou escolha outra pasta.",
+  "it": "Nome già in uso. Cambia nome o scegli un’altra cartella.",
+  "pl": "Nazwa jest zajęta. Zmień ją lub wybierz inny folder."
+ },
+ "目的地已有同名檔案。請選擇如何處理。": {
+  "en": "A file with this name already exists at the destination.",
+  "ja": "アップロード先に同名のファイルがあります。",
+  "zh-Hans": "目标位置已有同名文件。请选择处理方式。",
+  "ko": "대상 위치에 같은 이름의 파일이 있습니다.",
+  "fr": "Un fichier porte déjà ce nom à cet emplacement.",
+  "de": "Am Ziel gibt es bereits eine Datei mit diesem Namen.",
+  "ru": "В месте назначения уже есть файл с таким именем.",
+  "es": "Ya existe un archivo con ese nombre en el destino.",
+  "pt-BR": "Já existe um arquivo com esse nome no destino.",
+  "it": "Esiste già un file con questo nome nella destinazione.",
+  "pl": "W miejscu docelowym istnieje już plik o tej nazwie."
+ },
+ "目的地已有同名資料夾。請選其他位置，或先重新命名。": {
+  "en": "A folder with this name exists at the destination. Choose another location or rename the folder first.",
+  "ja": "移動先に同名のフォルダーがあります。別の場所を選ぶか、先に名前を変更してください。",
+  "zh-Hans": "目标位置已有同名文件夹。请另选位置或先重命名。",
+  "ko": "대상에 같은 이름의 폴더가 있습니다. 다른 위치를 선택하거나 먼저 이름을 변경하세요.",
+  "fr": "Un dossier porte déjà ce nom à cet emplacement. Choisissez un autre emplacement ou renommez d’abord le dossier.",
+  "de": "Am Ziel gibt es bereits einen gleichnamigen Ordner. Wählen Sie ein anderes Ziel oder benennen Sie den Ordner zuerst um.",
+  "ru": "В месте назначения есть одноимённая папка. Выберите другое место или сначала переименуйте папку.",
+  "es": "Ya existe una carpeta con ese nombre en el destino. Elige otro lugar o cambia el nombre primero.",
+  "pt-BR": "Já existe uma pasta com esse nome no destino. Escolha outro local ou renomeie a pasta primeiro.",
+  "it": "Esiste già una cartella con questo nome. Scegli un’altra posizione o rinomina prima la cartella.",
+  "pl": "W miejscu docelowym istnieje folder o tej nazwie. Wybierz inne miejsce lub najpierw zmień nazwę folderu."
+ },
  "確定": {
   "de": "OK",
   "en": "OK",
@@ -2819,6 +3495,32 @@
   "pt-BR": "OK",
   "ru": "ОК",
   "zh-Hans": "确定"
+ },
+ "確定要刪除這個資料夾嗎？": {
+  "en": "Delete this folder?",
+  "ja": "このフォルダーを削除しますか？",
+  "zh-Hans": "确定删除此文件夹吗？",
+  "ko": "이 폴더를 삭제할까요?",
+  "fr": "Supprimer ce dossier ?",
+  "de": "Diesen Ordner löschen?",
+  "ru": "Удалить эту папку?",
+  "es": "¿Eliminar esta carpeta?",
+  "pt-BR": "Excluir esta pasta?",
+  "it": "Eliminare questa cartella?",
+  "pl": "Usunąć ten folder?"
+ },
+ "確認上傳位置": {
+  "en": "Confirm upload destination",
+  "ja": "アップロード先の確認",
+  "zh-Hans": "确认上传位置",
+  "ko": "업로드 위치 확인",
+  "fr": "Confirmer la destination",
+  "de": "Ziel für Upload bestätigen",
+  "ru": "Подтвердить место загрузки",
+  "es": "Confirmar destino de carga",
+  "pt-BR": "Confirmar destino do envio",
+  "it": "Conferma destinazione caricamento",
+  "pl": "Potwierdź miejsce przesłania"
  },
  "移除 HTML 標籤": {
   "de": "HTML-Tags entfernen",
@@ -3366,6 +4068,32 @@
   "ru": "Режим таблицы (CSV/TSV)…",
   "zh-Hans": "表格模式（CSV／TSV）…"
  },
+ "複製": {
+  "en": "Copy",
+  "ja": "コピー",
+  "zh-Hans": "复制",
+  "ko": "복사",
+  "fr": "Copier",
+  "de": "Kopieren",
+  "ru": "Копировать",
+  "es": "Copiar",
+  "pt-BR": "Copiar",
+  "it": "Copia",
+  "pl": "Kopiuj"
+ },
+ "複製一份…": {
+  "en": "Make a copy…",
+  "ja": "コピーを作成…",
+  "zh-Hans": "创建副本…",
+  "ko": "복사본 만들기…",
+  "fr": "Créer une copie…",
+  "de": "Kopie erstellen…",
+  "ru": "Создать копию…",
+  "es": "Crear una copia…",
+  "pt-BR": "Criar uma cópia…",
+  "it": "Crea una copia…",
+  "pl": "Utwórz kopię…"
+ },
  "複製目前行": {
   "de": "Zeile duplizieren",
   "en": "Duplicate Line",
@@ -3405,6 +4133,19 @@
   "ru": "Дублировать выделение",
   "zh-Hans": "复制所选内容"
  },
+ "要刪除這份雲端檔案嗎？": {
+  "en": "Delete this cloud file?",
+  "ja": "このクラウドファイルを削除しますか？",
+  "zh-Hans": "要删除这个云端文件吗？",
+  "ko": "이 클라우드 파일을 삭제할까요?",
+  "fr": "Supprimer ce fichier cloud ?",
+  "de": "Diese Cloud-Datei löschen?",
+  "ru": "Удалить этот облачный файл?",
+  "es": "¿Eliminar este archivo en la nube?",
+  "pt-BR": "Excluir este arquivo na nuvem?",
+  "it": "Eliminare questo file cloud?",
+  "pl": "Usunąć ten plik z chmury?"
+ },
  "要恢復應用預設值嗎？": {
   "de": "App-Standardwerte wiederherstellen?",
   "en": "Restore the app defaults?",
@@ -3430,6 +4171,45 @@
   "pt-BR": "Descartar as alterações não salvas e recarregar?",
   "ru": "Отменить несохранённые изменения и перезагрузить?",
   "zh-Hans": "要放弃未保存的修改并重新载入吗？"
+ },
+ "要捨棄未儲存的修改嗎？": {
+  "en": "Discard unsaved changes?",
+  "ja": "保存していない変更を破棄しますか？",
+  "zh-Hans": "要放弃未保存的修改吗？",
+  "ko": "저장하지 않은 변경 내용을 버리시겠습니까?",
+  "fr": "Abandonner les modifications non enregistrées ?",
+  "de": "Nicht gesicherte Änderungen verwerfen?",
+  "ru": "Отменить несохранённые изменения?",
+  "es": "¿Descartar los cambios no guardados?",
+  "pt-BR": "Descartar as alterações não salvas?",
+  "it": "Annullare le modifiche non salvate?",
+  "pl": "Odrzucić niezapisane zmiany?"
+ },
+ "要覆蓋這份雲端檔案嗎？": {
+  "en": "Overwrite this cloud file?",
+  "ja": "このクラウドファイルを上書きしますか？",
+  "zh-Hans": "要覆盖这个云端文件吗？",
+  "ko": "이 클라우드 파일을 덮어쓸까요?",
+  "fr": "Écraser ce fichier cloud ?",
+  "de": "Diese Cloud-Datei überschreiben?",
+  "ru": "Перезаписать этот облачный файл?",
+  "es": "¿Sobrescribir este archivo en la nube?",
+  "pt-BR": "Sobrescrever este arquivo na nuvem?",
+  "it": "Sovrascrivere questo file cloud?",
+  "pl": "Zastąpić ten plik w chmurze?"
+ },
+ "覆蓋": {
+  "en": "Overwrite",
+  "ja": "上書き",
+  "zh-Hans": "覆盖",
+  "ko": "덮어쓰기",
+  "fr": "Remplacer",
+  "de": "Überschreiben",
+  "ru": "Заменить",
+  "es": "Reemplazar",
+  "pt-BR": "Substituir",
+  "it": "Sovrascrivi",
+  "pl": "Zastąp"
  },
  "視窗": {
   "de": "Fenster",
@@ -3470,6 +4250,19 @@
   "ru": "Комментарий",
   "zh-Hans": "注释"
  },
+ "詳細資料": {
+  "en": "Details",
+  "ja": "詳細",
+  "zh-Hans": "详细信息",
+  "ko": "자세히",
+  "fr": "Détails",
+  "de": "Details",
+  "ru": "Подробности",
+  "es": "Detalles",
+  "pt-BR": "Detalhes",
+  "it": "Dettagli",
+  "pl": "Szczegóły"
+ },
  "語法上色": {
   "de": "Syntaxhervorhebung",
   "en": "Syntax Coloring",
@@ -3495,6 +4288,58 @@
   "pt-BR": "Ajuda",
   "ru": "Справка",
   "zh-Hans": "帮助"
+ },
+ "請使用 .x60 副檔名儲存雲端文件的本機副本。": {
+  "en": "Use the .x60 extension for local copies of cloud documents.",
+  "ja": "ローカルコピーには .x60 拡張子を使用してください。",
+  "zh-Hans": "请使用 .x60 扩展名保存云端文件的本地副本。",
+  "ko": "로컬 복사본을 .x60 확장자로 저장하세요.",
+  "fr": "Utilisez l’extension .x60 pour les copies locales.",
+  "de": "Verwenden Sie .x60 für lokale Kopien.",
+  "ru": "Сохраняйте локальные копии с расширением .x60.",
+  "es": "Use la extensión .x60 para copias locales.",
+  "pt-BR": "Use a extensão .x60 para cópias locais.",
+  "it": "Usa l’estensione .x60 per le copie locali.",
+  "pl": "Używaj rozszerzenia .x60 dla kopii lokalnych."
+ },
+ "請先在「雲端設定」填寫 API 路徑。": {
+  "en": "Set the API path in Cloud settings.",
+  "ja": "クラウド設定で API パスを指定してください。",
+  "zh-Hans": "请先在云端设置中填写 API 路径。",
+  "ko": "클라우드 설정에서 API 경로를 입력하세요.",
+  "fr": "Indiquez le chemin de l’API dans les paramètres du cloud.",
+  "de": "Geben Sie den API-Pfad in den Cloud-Einstellungen an.",
+  "ru": "Укажите путь к API в настройках облака.",
+  "es": "Indique la ruta de la API en los ajustes de la nube.",
+  "pt-BR": "Informe o caminho da API nas configurações da nuvem.",
+  "it": "Imposta il percorso API nelle impostazioni cloud.",
+  "pl": "Ustaw ścieżkę API w ustawieniach chmury."
+ },
+ "請先移出這個資料夾中的檔案與子資料夾。": {
+  "en": "The folder must be empty before it can be deleted.",
+  "ja": "削除するにはフォルダーを空にしてください。",
+  "zh-Hans": "请先移出此文件夹中的文件和子文件夹。",
+  "ko": "삭제하려면 폴더를 비워 주세요.",
+  "fr": "Videz le dossier avant de le supprimer.",
+  "de": "Leeren Sie den Ordner vor dem Löschen.",
+  "ru": "Перед удалением очистите папку.",
+  "es": "Vacía la carpeta antes de eliminarla.",
+  "pt-BR": "Esvazie a pasta antes de excluí-la.",
+  "it": "Svuota la cartella prima di eliminarla.",
+  "pl": "Opróżnij folder przed jego usunięciem."
+ },
+ "請先解密這份 X60 文件，再儲存至雲端。": {
+  "en": "Unlock this X60 document before saving to the cloud.",
+  "ja": "クラウドに保存する前に X60 を復号してください。",
+  "zh-Hans": "请先解密这份 X60 文件，再保存到云端。",
+  "ko": "클라우드에 저장하기 전에 X60 문서를 복호화하세요.",
+  "fr": "Déverrouillez le document X60 avant de l’enregistrer dans le cloud.",
+  "de": "Entschlüsseln Sie das X60-Dokument vor dem Speichern in der Cloud.",
+  "ru": "Расшифруйте документ X60 перед сохранением в облако.",
+  "es": "Descifre el documento X60 antes de guardarlo en la nube.",
+  "pt-BR": "Descriptografe o documento X60 antes de salvar na nuvem.",
+  "it": "Decifra il documento X60 prima di salvarlo sul cloud.",
+  "pl": "Odszyfruj dokument X60 przed zapisaniem w chmurze."
  },
  "請在 AND 前後輸入搜尋文字。": {
   "de": "Geben Sie vor und nach AND einen Suchtext ein.",
@@ -3522,6 +4367,19 @@
   "ru": "Введите текст для поиска до и после OR.",
   "zh-Hans": "请在 OR 前后输入搜索文字。"
  },
+ "請更新伺服器上的 Notepad2XS 雲端 PHP。": {
+  "en": "Update the Notepad2XS cloud PHP script on the server.",
+  "ja": "サーバーの Notepad2XS 用 PHP を更新してください。",
+  "zh-Hans": "请更新服务器上的 Notepad2XS 云端 PHP。",
+  "ko": "서버에서 Notepad2XS 클라우드 PHP를 업데이트하세요.",
+  "fr": "Mettez à jour le script PHP de Notepad2XS sur le serveur.",
+  "de": "Aktualisieren Sie das Notepad2XS-Cloud-PHP auf dem Server.",
+  "ru": "Обновите облачный PHP-скрипт Notepad2XS на сервере.",
+  "es": "Actualiza el PHP de Notepad2XS en el servidor.",
+  "pt-BR": "Atualize o PHP do Notepad2XS no servidor.",
+  "it": "Aggiorna lo script PHP di Notepad2XS sul server.",
+  "pl": "Zaktualizuj skrypt PHP Notepad2XS na serwerze."
+ },
  "請用成對的雙引號包住片語，並在引號內輸入搜尋文字。": {
   "de": "Setzen Sie eine nicht leere Wortgruppe in doppelte Anführungszeichen.",
   "en": "Enclose a nonempty phrase in matching double quotes.",
@@ -3534,6 +4392,45 @@
   "pt-BR": "Coloque uma expressão não vazia entre aspas duplas.",
   "ru": "Заключите непустую фразу в парные двойные кавычки.",
   "zh-Hans": "请用成对的双引号括住短语，并在引号内输入搜索文字。"
+ },
+ "請輸入 HTTP 或 HTTPS 的資料夾網址。": {
+  "en": "Enter an HTTP or HTTPS folder URL.",
+  "ja": "HTTP または HTTPS のフォルダー URL を入力してください。",
+  "zh-Hans": "请输入 HTTP 或 HTTPS 的文件夹网址。",
+  "ko": "HTTP 또는 HTTPS 폴더 주소를 입력하세요.",
+  "fr": "Saisissez l’URL HTTP ou HTTPS du dossier.",
+  "de": "Geben Sie eine HTTP- oder HTTPS-Ordneradresse ein.",
+  "ru": "Введите URL папки по HTTP или HTTPS.",
+  "es": "Escriba la URL HTTP o HTTPS de la carpeta.",
+  "pt-BR": "Digite a URL HTTP ou HTTPS da pasta.",
+  "it": "Inserisci l’URL HTTP o HTTPS della cartella.",
+  "pl": "Wpisz adres folderu HTTP lub HTTPS."
+ },
+ "請輸入有效檔名並省略 .x60 副檔名。": {
+  "en": "Enter a valid name without the .x60 extension.",
+  "ja": ".x60 拡張子を除いた有効な名前を入力してください。",
+  "zh-Hans": "请输入有效文件名并省略 .x60 扩展名。",
+  "ko": ".x60 확장자를 제외한 올바른 이름을 입력하세요.",
+  "fr": "Saisissez un nom valide sans l’extension .x60.",
+  "de": "Geben Sie einen gültigen Namen ohne .x60 ein.",
+  "ru": "Введите допустимое имя без расширения .x60.",
+  "es": "Escriba un nombre válido sin la extensión .x60.",
+  "pt-BR": "Digite um nome válido sem a extensão .x60.",
+  "it": "Inserisci un nome valido senza l’estensione .x60.",
+  "pl": "Wpisz prawidłową nazwę bez rozszerzenia .x60."
+ },
+ "請選擇這個資料夾及其子資料夾以外的位置。": {
+  "en": "Choose a destination outside this folder and its subfolders.",
+  "ja": "このフォルダーとそのサブフォルダー以外を選択してください。",
+  "zh-Hans": "请选择此文件夹及其子文件夹以外的位置。",
+  "ko": "이 폴더와 하위 폴더 외의 위치를 선택하세요.",
+  "fr": "Choisissez un emplacement en dehors de ce dossier et de ses sous-dossiers.",
+  "de": "Wählen Sie ein Ziel außerhalb dieses Ordners und seiner Unterordner.",
+  "ru": "Выберите расположение вне этой папки и её подпапок.",
+  "es": "Elige un destino fuera de esta carpeta y sus subcarpetas.",
+  "pt-BR": "Escolha um destino fora desta pasta e de suas subpastas.",
+  "it": "Scegli una destinazione esterna a questa cartella e alle sue sottocartelle.",
+  "pl": "Wybierz miejsce poza tym folderem i jego podfolderami."
  },
  "變更介面語言後，請重新啟動 Notepad2XS。": {
   "de": "Starten Sie Notepad2XS nach dem Sprachwechsel neu.",
@@ -3587,6 +4484,19 @@
   "ru": "Папка",
   "zh-Hans": "文件夹"
  },
+ "路徑": {
+  "en": "Path",
+  "ja": "パス",
+  "zh-Hans": "路径",
+  "ko": "경로",
+  "fr": "Chemin",
+  "de": "Pfad",
+  "ru": "Путь",
+  "es": "Ruta",
+  "pt-BR": "Caminho",
+  "it": "Percorso",
+  "pl": "Ścieżka"
+ },
  "路徑與檔案名稱": {
   "de": "Pfad und Dateiname",
   "en": "Path and File Name",
@@ -3612,6 +4522,45 @@
   "pt-BR": "Ir para a linha…",
   "ru": "Перейти к строке…",
   "zh-Hans": "跳至行…"
+ },
+ "跳過": {
+  "en": "Skip",
+  "ja": "スキップ",
+  "zh-Hans": "跳过",
+  "ko": "건너뛰기",
+  "fr": "Ignorer",
+  "de": "Überspringen",
+  "ru": "Пропустить",
+  "es": "Omitir",
+  "pt-BR": "Ignorar",
+  "it": "Salta",
+  "pl": "Pomiń"
+ },
+ "載入「%@」時發生錯誤。": {
+  "en": "An error occurred while loading “%@”.",
+  "ja": "「%@」の読み込み中にエラーが発生しました。",
+  "zh-Hans": "加载“%@”时发生错误。",
+  "ko": "“%@”을(를) 불러오는 중 오류가 발생했습니다.",
+  "fr": "Une erreur s’est produite lors du chargement de « %@ ».",
+  "de": "Beim Laden von „%@“ ist ein Fehler aufgetreten.",
+  "ru": "Ошибка при загрузке «%@».",
+  "es": "Se produjo un error al cargar «%@».",
+  "pt-BR": "Ocorreu um erro ao carregar “%@”.",
+  "it": "Si è verificato un errore durante il caricamento di «%@».",
+  "pl": "Wystąpił błąd podczas wczytywania „%@”."
+ },
+ "輸入放置 notepad2xs_cloud_fils_system.php 的資料夾網址，程式會自動補上 PHP 檔名。": {
+  "en": "Enter the URL of the folder that contains notepad2xs_cloud_fils_system.php. The PHP file name is added automatically.",
+  "ja": "notepad2xs_cloud_fils_system.php を置いたフォルダの URL を入力してください。PHP ファイル名は自動で付加されます。",
+  "zh-Hans": "输入放置 notepad2xs_cloud_fils_system.php 的文件夹网址，程序会自动补上 PHP 文件名。",
+  "ko": "notepad2xs_cloud_fils_system.php가 있는 폴더 URL을 입력하십시오. PHP 파일 이름은 자동으로 추가됩니다.",
+  "fr": "Saisissez l’URL du dossier contenant notepad2xs_cloud_fils_system.php. Le nom du fichier PHP est ajouté automatiquement.",
+  "de": "Geben Sie die URL des Ordners mit notepad2xs_cloud_fils_system.php ein. Der PHP-Dateiname wird automatisch ergänzt.",
+  "ru": "Введите адрес папки с notepad2xs_cloud_fils_system.php. Имя PHP-файла добавляется автоматически.",
+  "es": "Escriba la URL de la carpeta que contiene notepad2xs_cloud_fils_system.php. El nombre del archivo PHP se agrega automáticamente.",
+  "pt-BR": "Digite a URL da pasta que contém notepad2xs_cloud_fils_system.php. O nome do arquivo PHP é adicionado automaticamente.",
+  "it": "Inserisci l’URL della cartella che contiene notepad2xs_cloud_fils_system.php. Il nome del file PHP viene aggiunto automaticamente.",
+  "pl": "Wpisz adres folderu zawierającego notepad2xs_cloud_fils_system.php. Nazwa pliku PHP zostanie dodana automatycznie."
  },
  "轉為大寫": {
   "de": "Großbuchstaben",
@@ -3639,6 +4588,32 @@
   "ru": "Нижний регистр",
   "zh-Hans": "转为小写"
  },
+ "這個位置已有同名資料夾。": {
+  "en": "A folder with that name already exists here.",
+  "ja": "ここには同じ名前のフォルダーがあります。",
+  "zh-Hans": "当前位置已有同名文件夹。",
+  "ko": "이 위치에 같은 이름의 폴더가 있습니다.",
+  "fr": "Un dossier porte déjà ce nom ici.",
+  "de": "Hier gibt es bereits einen Ordner mit diesem Namen.",
+  "ru": "Здесь уже есть одноимённая папка.",
+  "es": "Ya existe una carpeta con ese nombre aquí.",
+  "pt-BR": "Já existe uma pasta com esse nome aqui.",
+  "it": "Qui esiste già una cartella con questo nome.",
+  "pl": "W tym miejscu istnieje już folder o tej nazwie."
+ },
+ "這個檔案已在另一個分頁開啟。請選擇其他檔名。": {
+  "en": "This file is already open in another tab. Choose a different name.",
+  "ja": "このファイルは別のタブで開いています。別の名前を選択してください。",
+  "zh-Hans": "此文件已在另一个标签页中打开。请选择其他文件名。",
+  "ko": "이 파일이 다른 탭에 이미 열려 있습니다. 다른 이름을 선택하세요.",
+  "fr": "Ce fichier est déjà ouvert dans un autre onglet. Choisissez un autre nom.",
+  "de": "Die Datei ist bereits in einem anderen Tab geöffnet. Wählen Sie einen anderen Namen.",
+  "ru": "Этот файл уже открыт в другой вкладке. Выберите другое имя.",
+  "es": "Este archivo ya está abierto en otra pestaña. Elige otro nombre.",
+  "pt-BR": "Este arquivo já está aberto em outra guia. Escolha outro nome.",
+  "it": "Il file è già aperto in un’altra scheda. Scegli un altro nome.",
+  "pl": "Ten plik jest już otwarty na innej karcie. Wybierz inną nazwę."
+ },
  "連接設定…": {
   "de": "Verbindungseinstellungen…",
   "en": "Connection Settings…",
@@ -3651,6 +4626,19 @@
   "pt-BR": "Configurações de conexão…",
   "ru": "Настройки подключения…",
   "zh-Hans": "连接设置…"
+ },
+ "連線失敗或逾時，請檢查 API 路徑與連線。": {
+  "en": "Connection failed or timed out. Check the API path and network.",
+  "ja": "接続に失敗したかタイムアウトしました。API パスと通信を確認してください。",
+  "zh-Hans": "连接失败或超时，请检查 API 路径与网络。",
+  "ko": "연결에 실패했거나 시간이 초과되었습니다. API 경로와 네트워크를 확인하세요.",
+  "fr": "Échec ou délai de connexion. Vérifiez le chemin de l’API et le réseau.",
+  "de": "Verbindung fehlgeschlagen oder Zeitüberschreitung. Prüfen Sie API-Pfad und Netzwerk.",
+  "ru": "Сбой или тайм-аут. Проверьте путь к API и сеть.",
+  "es": "Falló la conexión o se agotó el tiempo. Compruebe la ruta de la API y la red.",
+  "pt-BR": "Falha ou tempo esgotado. Verifique o caminho da API e a rede.",
+  "it": "Connessione non riuscita o scaduta. Controlla il percorso API e la rete.",
+  "pl": "Błąd lub limit czasu. Sprawdź ścieżkę API i sieć."
  },
  "進入全螢幕": {
   "de": "Vollbildmodus",
@@ -3690,6 +4678,32 @@
   "pt-BR": "Escapar tags HTML",
   "ru": "Экранировать HTML",
   "zh-Hans": "转义 HTML 标签"
+ },
+ "遞增": {
+  "en": "Ascending",
+  "ja": "昇順",
+  "zh-Hans": "升序",
+  "ko": "오름차순",
+  "fr": "Croissant",
+  "de": "Aufsteigend",
+  "ru": "По возрастанию",
+  "es": "Ascendente",
+  "pt-BR": "Crescente",
+  "it": "Crescente",
+  "pl": "Rosnąco"
+ },
+ "遞減": {
+  "en": "Descending",
+  "ja": "降順",
+  "zh-Hans": "降序",
+  "ko": "내림차순",
+  "fr": "Décroissant",
+  "de": "Absteigend",
+  "ru": "По убыванию",
+  "es": "Descendente",
+  "pt-BR": "Decrescente",
+  "it": "Decrescente",
+  "pl": "Malejąco"
  },
  "選擇…": {
   "de": "Auswählen…",
@@ -3769,6 +4783,19 @@
   "ru": "Повторить",
   "zh-Hans": "重做"
  },
+ "重新整理": {
+  "en": "Refresh",
+  "ja": "更新",
+  "zh-Hans": "刷新",
+  "ko": "새로 고침",
+  "fr": "Actualiser",
+  "de": "Aktualisieren",
+  "ru": "Обновить",
+  "es": "Actualizar",
+  "pt-BR": "Atualizar",
+  "it": "Aggiorna",
+  "pl": "Odśwież"
+ },
  "重新載入": {
   "de": "Neu laden",
   "en": "Reload",
@@ -3782,6 +4809,19 @@
   "ru": "Обновить",
   "zh-Hans": "重新加载"
  },
+ "重新選擇": {
+  "en": "Choose Again",
+  "ja": "選び直す",
+  "zh-Hans": "重新选择",
+  "ko": "다시 선택",
+  "fr": "Choisir à nouveau",
+  "de": "Neu wählen",
+  "ru": "Выбрать снова",
+  "es": "Elegir de nuevo",
+  "pt-BR": "Escolher novamente",
+  "it": "Scegli di nuovo",
+  "pl": "Wybierz ponownie"
+ },
  "重新開啟時還原上次的分頁（只還原已存檔的文件）": {
   "de": "Vorherige Tabs beim erneuten Öffnen wiederherstellen (nur gesicherte Dokumente)",
   "en": "Restore the previous tabs on reopening (saved documents only)",
@@ -3794,6 +4834,19 @@
   "pt-BR": "Restaurar as abas anteriores ao reabrir (apenas documentos salvos)",
   "ru": "Восстанавливать вкладки при повторном запуске (только сохранённые)",
   "zh-Hans": "重新打开时还原上次的标签页（只还原已保存的文档）"
+ },
+ "重新開啟關閉的分頁": {
+  "en": "Reopen closed tab",
+  "ja": "閉じたタブを開き直す",
+  "zh-Hans": "重新打开已关闭的标签页",
+  "ko": "닫은 탭 다시 열기",
+  "fr": "Rouvrir un onglet fermé",
+  "de": "Geschlossenen Tab wieder öffnen",
+  "ru": "Открыть закрытую вкладку",
+  "es": "Reabrir pestaña cerrada",
+  "pt-BR": "Reabrir guia fechada",
+  "it": "Riapri scheda chiusa",
+  "pl": "Otwórz zamkniętą kartę"
  },
  "重設工具列": {
   "de": "Symbolleiste zurücksetzen",
@@ -3821,6 +4874,19 @@
   "ru": "Маркер длинных строк",
   "zh-Hans": "长行标记"
  },
+ "開啟": {
+  "en": "Open",
+  "ja": "開く",
+  "zh-Hans": "打开",
+  "ko": "열기",
+  "fr": "Ouvrir",
+  "de": "Öffnen",
+  "ru": "Открыть",
+  "es": "Abrir",
+  "pt-BR": "Abrir",
+  "it": "Apri",
+  "pl": "Otwórz"
+ },
  "開啟…": {
   "de": "Öffnen…",
   "en": "Open…",
@@ -3833,6 +4899,19 @@
   "pt-BR": "Abrir…",
   "ru": "Открыть…",
   "zh-Hans": "打开…"
+ },
+ "開啟所在資料夾": {
+  "en": "Open containing folder",
+  "ja": "親フォルダーを開く",
+  "zh-Hans": "打开所在文件夹",
+  "ko": "포함된 폴더 열기",
+  "fr": "Ouvrir le dossier parent",
+  "de": "Übergeordneten Ordner öffnen",
+  "ru": "Открыть родительскую папку",
+  "es": "Abrir carpeta contenedora",
+  "pt-BR": "Abrir pasta de origem",
+  "it": "Apri cartella contenente",
+  "pl": "Otwórz folder nadrzędny"
  },
  "開啟文件：": {
   "de": "Dokumente öffnen:",
@@ -3990,6 +5069,123 @@
   "ru": "Хеш",
   "zh-Hans": "哈希计算"
  },
+ "雲端": {
+  "en": "Cloud",
+  "ja": "クラウド",
+  "zh-Hans": "云端",
+  "ko": "클라우드",
+  "fr": "Cloud",
+  "de": "Cloud",
+  "ru": "Облако",
+  "es": "Nube",
+  "pt-BR": "Nuvem",
+  "it": "Cloud",
+  "pl": "Chmura"
+ },
+ "雲端儲存未完成，請確認後重試。": {
+  "en": "Cloud save did not finish. Check the file and try again.",
+  "ja": "クラウドへの保存に失敗しました。確認して再試行してください。",
+  "zh-Hans": "云端保存未完成，请检查后重试。",
+  "ko": "클라우드 저장이 완료되지 않았습니다. 확인 후 다시 시도하세요.",
+  "fr": "Enregistrement cloud interrompu. Vérifiez le fichier et réessayez.",
+  "de": "Cloud-Speicherung fehlgeschlagen. Prüfen Sie die Datei und versuchen Sie es erneut.",
+  "ru": "Сохранение в облако не завершено. Проверьте файл и повторите попытку.",
+  "es": "No se completó el guardado. Compruebe el archivo y reintente.",
+  "pt-BR": "O salvamento não foi concluído. Verifique e tente novamente.",
+  "it": "Salvataggio cloud incompleto. Controlla il file e riprova.",
+  "pl": "Zapis w chmurze nie został ukończony. Sprawdź plik i ponów próbę."
+ },
+ "雲端已有同名檔案。": {
+  "en": "A cloud file with this name already exists.",
+  "ja": "同じ名前のクラウドファイルがあります。",
+  "zh-Hans": "云端已有同名文件。",
+  "ko": "같은 이름의 클라우드 파일이 있습니다.",
+  "fr": "Un fichier cloud porte déjà ce nom.",
+  "de": "Eine Cloud-Datei mit diesem Namen ist bereits vorhanden.",
+  "ru": "Файл с таким именем уже есть в облаке.",
+  "es": "Ya existe un archivo con ese nombre en la nube.",
+  "pt-BR": "Já existe um arquivo com esse nome na nuvem.",
+  "it": "Esiste già un file cloud con questo nome.",
+  "pl": "Plik o tej nazwie już istnieje w chmurze."
+ },
+ "雲端檔案": {
+  "en": "Cloud files",
+  "ja": "クラウドファイル",
+  "zh-Hans": "云端文件",
+  "ko": "클라우드 파일",
+  "fr": "Fichiers du cloud",
+  "de": "Cloud-Dateien",
+  "ru": "Облачные файлы",
+  "es": "Archivos en la nube",
+  "pt-BR": "Arquivos na nuvem",
+  "it": "File cloud",
+  "pl": "Pliki w chmurze"
+ },
+ "雲端檔案…": {
+  "en": "Cloud Files…",
+  "ja": "クラウドファイル…",
+  "zh-Hans": "云端文件…",
+  "ko": "클라우드 파일…",
+  "fr": "Fichiers cloud…",
+  "de": "Cloud-Dateien…",
+  "ru": "Облачные файлы…",
+  "es": "Archivos en la nube…",
+  "pt-BR": "Arquivos na nuvem…",
+  "it": "File cloud…",
+  "pl": "Pliki w chmurze…"
+ },
+ "雲端檔案在開啟後已變更。請重新開啟並比對內容。": {
+  "en": "The cloud file changed after opening. Reopen it and compare the contents.",
+  "ja": "開いた後にファイルが変更されました。開き直して内容を比較してください。",
+  "zh-Hans": "云端文件在打开后已更改，请重新打开并比较内容。",
+  "ko": "열린 후 클라우드 파일이 변경되었습니다. 다시 열어 내용을 비교하세요.",
+  "fr": "Le fichier cloud a changé. Rouvrez-le pour comparer le contenu.",
+  "de": "Die Cloud-Datei wurde geändert. Öffnen Sie sie erneut und vergleichen Sie den Inhalt.",
+  "ru": "Облачный файл изменился. Откройте его снова и сравните содержимое.",
+  "es": "El archivo en la nube cambió. Vuelva a abrirlo y compare el contenido.",
+  "pt-BR": "O arquivo na nuvem mudou. Reabra e compare o conteúdo.",
+  "it": "Il file cloud è cambiato. Riaprilo e confronta il contenuto.",
+  "pl": "Plik w chmurze uległ zmianie. Otwórz go ponownie i porównaj zawartość."
+ },
+ "雲端檔案或逐檔設定已更新，這次逐檔設定未寫入。": {
+  "en": "The cloud file or its settings changed. Your file settings were not written.",
+  "ja": "クラウド上のファイルまたは設定が更新されたため、この設定は保存しませんでした。",
+  "zh-Hans": "云端文件或逐文件设置已更新，本次设置未写入。",
+  "ko": "클라우드 파일이나 설정이 변경되어 이번 설정은 저장되지 않았습니다.",
+  "fr": "Le fichier ou ses réglages ont changé. Vos réglages n’ont pas été enregistrés.",
+  "de": "Die Cloud-Datei oder ihre Einstellungen wurden geändert. Ihre Dateieinstellungen wurden nicht gespeichert.",
+  "ru": "Облачный файл или его настройки изменились. Ваши настройки не сохранены.",
+  "es": "El archivo o sus ajustes cambiaron. Tus ajustes no se guardaron.",
+  "pt-BR": "O arquivo ou os ajustes foram alterados. Seus ajustes não foram gravados.",
+  "it": "Il file o le sue impostazioni sono cambiati. Le tue impostazioni non sono state salvate.",
+  "pl": "Plik lub jego ustawienia uległy zmianie. Twoje ustawienia nie zostały zapisane."
+ },
+ "雲端設定": {
+  "en": "Cloud settings",
+  "ja": "クラウド設定",
+  "zh-Hans": "云端设置",
+  "ko": "클라우드 설정",
+  "fr": "Paramètres du cloud",
+  "de": "Cloud-Einstellungen",
+  "ru": "Настройки облака",
+  "es": "Ajustes de la nube",
+  "pt-BR": "Configurações da nuvem",
+  "it": "Impostazioni cloud",
+  "pl": "Ustawienia chmury"
+ },
+ "雲端設定…": {
+  "en": "Cloud Settings…",
+  "ja": "クラウド設定…",
+  "zh-Hans": "云端设置…",
+  "ko": "클라우드 설정…",
+  "fr": "Réglages cloud…",
+  "de": "Cloud-Einstellungen…",
+  "ru": "Настройки облака…",
+  "es": "Configuración de la nube…",
+  "pt-BR": "Configurações da nuvem…",
+  "it": "Impostazioni cloud…",
+  "pl": "Ustawienia chmury…"
+ },
  "零寬空白": {
   "de": "Leerzeichen ohne Breite",
   "en": "Zero-width space",
@@ -4067,6 +5263,19 @@
   "pt-BR": "Chaves padrão…",
   "ru": "Ключи по умолчанию…",
   "zh-Hans": "默认密钥…"
+ },
+ "類型": {
+  "en": "Type",
+  "ja": "種類",
+  "zh-Hans": "类型",
+  "ko": "유형",
+  "fr": "Type",
+  "de": "Typ",
+  "ru": "Тип",
+  "es": "Tipo",
+  "pt-BR": "Tipo",
+  "it": "Tipo",
+  "pl": "Typ"
  },
  "顯示字元與符號": {
   "de": "Zeichen anzeigen",

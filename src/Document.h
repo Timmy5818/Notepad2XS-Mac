@@ -4,6 +4,7 @@
 #import "TextEncoding.h"
 #import "CryptoUI.h"
 #import "ArchiveEdit.h"
+#import "CloudFiles.h"
 
 @class EditorWindowController;
 
@@ -38,11 +39,17 @@ typedef NS_ENUM(NSInteger, N2CryptoState) {
 @property (nonatomic, strong) N2ArchiveLink *archiveLink;
 @property (nonatomic, readonly) BOOL isImageDocument;   // 檔案是 JPG／PNG／WebP（文字內嵌在圖片區塊）
 
+// 雲端 X60 檔案（R159～R166）：沒有本機路徑，⌘S 以原密碼 EXES 加密後存回雲端
+@property (nonatomic, strong) N2CloudFile *cloud;
+@property (nonatomic, copy) NSData *cloudInitialState;   // EXES 加密前的書籤與檢視（存到雲端時作為初始逐檔設定）
+- (void)loadCloudCiphertext:(NSData *)cipher;            // 放入下載的密文（開啟後詢問密碼）
+
 // 載入原始位元組（版本歷史還原／開啟複本用）
 - (BOOL)loadRawData:(NSData *)raw imageURL:(NSURL *)imageURL error:(NSError **)error;   // imageURL 是圖片時依圖片格式解讀
 
-// 用指定編碼重新讀取磁碟上的檔案（會捨棄未儲存的修改）
+// 用指定編碼重新讀取磁碟上的檔案（會捨棄未儲存的修改）；encoding 為負值時自動偵測
 - (BOOL)reloadWithEncoding:(N2Encoding)encoding error:(NSError **)error;
+- (BOOL)reloadWithPreferredEncoding:(int)resource;   // Windows 版編碼資源 ID；無法套用時回傳 NO
 
 @end
 

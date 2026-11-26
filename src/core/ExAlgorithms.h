@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <functional>
 namespace xs {
 std::string exmd3(const std::u16string &text);
@@ -14,3 +15,7 @@ std::string exesEncrypt(const std::string &text, const std::string &password,
                         const uint8_t *fixedRandom48 = nullptr);
 std::string exesDecrypt(const std::string &cipher, const std::string &password);
 } // namespace xs
+
+namespace xs {
+bool validX60Envelope(std::string_view cipher) noexcept;
+}

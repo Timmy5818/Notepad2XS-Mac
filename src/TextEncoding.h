@@ -30,3 +30,8 @@ int N2DetectEOLMode(const char *utf8, size_t length, int defaultMode);
 
 // 嚴格檢查是否為合法 UTF-8
 BOOL N2IsValidUTF8(const unsigned char *p, size_t n);
+
+// 個別檔案開檔編碼（R155）：與 Windows 版編碼資源 ID（61000 起）互換
+// BOM 版本與無 BOM 版本使用同一個 ID（讀取時 BOM 會自動判斷）
+int N2EncodingReadResource(N2Encoding enc);
+BOOL N2EncodingForReadResource(int resource, N2Encoding *enc);   // 不支援的編碼回傳 NO

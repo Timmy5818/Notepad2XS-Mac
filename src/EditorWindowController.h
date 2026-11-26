@@ -4,6 +4,7 @@
 #include "Scintilla.h"
 
 #import "BookmarkStore.h"
+#import "TextEncoding.h"
 
 @class ScintillaView, Document;
 
@@ -87,6 +88,27 @@ static const NSInteger N2ReplaceAllReadOnly = -2;   // replaceAll：文件唯讀
 @end
 void N2InstallAutoPair(ScintillaView *v);
 
+// 個別檔案設定：語法、開檔編碼、自動換行（R155；實作在 EditorFilePrefs.mm）
+@interface EditorWindowController (FilePrefs)
+@property (nonatomic, readonly) BOOL effectiveWordWrap;   // 此檔案的換行設定（沒有時跟隨全域設定）
+- (void)installFilePreferenceHook;
+- (void)applyFilePreferences;
+- (void)fileEncodingSaved;
+- (void)finalizeDocumentState;                           // 關閉分頁／結束程式時保存書籤與檢視（R156）
+- (void)rememberSelectedLanguage;
+- (void)rememberReadEncoding:(N2Encoding)enc;
+- (BOOL)validateFilePreferenceItem:(NSMenuItem *)item handled:(BOOL *)handled;
+@end
+
+// 雲端 X60 檔案（R159～R166；實作在 EditorCloud.mm）
+@interface EditorWindowController (Cloud)
+- (void)saveCloudDocument:(void (^)(BOOL ok))completion;
+- (void)saveCloudViewIncludingBookmarks:(BOOL)includeBookmarks;
+- (void)rememberStateBeforeEncryption;
+- (BOOL)validateCloudItem:(NSMenuItem *)item handled:(BOOL *)handled;
+@end
+void N2OpenCloudFiles(EditorWindowController *anchor);   // anchor 為 nil 時開在新視窗
+
 // 多分頁（實作在 EditorTabs.mm）
 @interface EditorWindowController (Tabs)
 - (void)setupTabbing;
@@ -98,6 +120,9 @@ void N2CloseAllDocuments(void (^completion)(BOOL closed));
 void N2SaveSession(void);
 BOOL N2HasSessionToRestore(void);
 void N2RestoreSession(void (^done)(BOOL restored));
+void N2RememberClosedDocument(Document *doc);            // R158：最近關閉的 32 個分頁
+BOOL N2HasClosedDocuments(void);
+void N2ReopenClosedDocument(void);
 
 // 工具列（實作在 EditorToolbar.mm）
 @interface EditorWindowController (Toolbar) <NSToolbarDelegate>

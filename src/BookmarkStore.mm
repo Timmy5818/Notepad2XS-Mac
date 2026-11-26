@@ -3,6 +3,7 @@
 #include "BookmarkFile.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <climits>
@@ -13,6 +14,7 @@ namespace {
 struct FileState {
     std::vector<LineBookmark> lines;
     std::optional<ViewState> view;
+    FilePreferences preferences = automaticPreferences;
 };
 
 struct Sidecar {
@@ -70,7 +72,7 @@ bool ReadSidecar(const Sidecar &s, FileState &state) {
     std::string bytes((size_t)st.st_size, '\0');
     ssize_t n = read(fd, bytes.data(), bytes.size());
     close(fd);
-    if (n != (ssize_t)bytes.size() || !parse(bytes, state.lines, &state.view)) throw std::runtime_error("invalid bookmark data");
+    if (n != (ssize_t)bytes.size() || !parse(bytes, state.lines, &state.view, &state.preferences)) throw std::runtime_error("invalid bookmark data");
     return true;
 }
 
@@ -93,24 +95,68 @@ void EnsureReadme(const std::string &folder) noexcept {
         std::string path = folder + "/readme.txt";
         struct stat st;
         if (lstat(path.c_str(), &st) == 0 && !S_ISDIR(st.st_mode)) return;
-        static const char message[] = "\xEF\xBB\xBF這是 notepad2xs 相關設定檔用資料夾。\r\n"
-                                      "內含此目錄各文件的手動書籤與檢視狀態。\r\n";
-        Publish(folder, path, std::string_view(message, sizeof(message) - 1), false);
+        // R157：英文 ASCII（也是合法的 UTF-8，不需要 BOM）；已有的說明檔保留原內容
+        static constexpr std::string_view message =
+            "Notepad2XS Per-File Settings\r\n"
+            "===========================\r\n"
+            "\r\n"
+            "Notepad2XS creates this folder to store settings for files in the\r\n"
+            "parent folder. Each document has its own INI file.\r\n"
+            "\r\n"
+            "These INI files store manual line bookmarks and their colors,\r\n"
+            "cursor and scroll positions, zoom, and any file-specific choices\r\n"
+            "for syntax highlighting, opening encoding, and word wrap.\r\n"
+            "\r\n"
+            "Notepad2XS uses this information to restore your settings when\r\n"
+            "you reopen a document. The document text is stored in the original file.\r\n"
+            "\r\n"
+            "Official website\r\n"
+            "https://dz.jplopsoft.idv.tw/\r\n"
+            "\r\n"
+            "Software user guide\r\n"
+            "https://dz.jplopsoft.idv.tw/show_the_postdata.php?tid=82377\r\n"
+            "\r\n"
+            "Contact email\r\n"
+            "hawl.remotek@gmail.com\r\n";
+        Publish(folder, path, message, false);
     } catch (...) {
         // 說明檔與文件設定無關，失敗也不影響
     }
 }
 
-void WriteSidecar(const Sidecar &s, const std::vector<LineBookmark> *lines, const std::optional<ViewState> &view) {
+// 同一份 .2xs 可能同時被其他視窗或程式改寫：讀取、合併、取代的過程鎖住 .2xs 資料夾（等候最多 0.5 秒；
+// 不另外建立鎖定檔，資料夾內容與 Windows 版相同）
+struct SidecarLock {
+    int fd = -1;
+    explicit SidecarLock(const Sidecar &s) {
+        fd = open(s.folder.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (fd < 0) throw std::runtime_error("cannot open document settings lock");
+        for (int i = 0; i < 50; ++i) {
+            if (flock(fd, LOCK_EX | LOCK_NB) == 0) return;
+            usleep(10000);
+        }
+        close(fd);
+        throw std::runtime_error("document settings are busy");
+    }
+    ~SidecarLock() { if (fd >= 0) { flock(fd, LOCK_UN); close(fd); } }
+};
+
+// preferenceFields：要寫入的個別設定欄位（位元）；其餘欄位保留檔案裡原本的值
+void WriteSidecar(const Sidecar &s, const std::vector<LineBookmark> *lines, const std::optional<ViewState> &view,
+                  const FilePreferences &current = automaticPreferences, unsigned preferenceFields = 0) {
     bool exists = false;
     OpenFolder(s, true, &exists);
     EnsureReadme(s.folder);
+    SidecarLock lock(s);
     FileState state;
     const bool had = ReadSidecar(s, state);
-    if (had && (!lines || *lines == state.lines) && (!view || view == state.view)) return;
+    auto preferences = state.preferences;
+    for (std::size_t i = 0; i < preferences.size(); ++i)
+        if (preferenceFields & (1u << i)) preferences[i] = current[i];
+    if (had && (!lines || *lines == state.lines) && (!view || view == state.view) && preferences == state.preferences) return;
     if (lines) state.lines = *lines;
     if (view) state.view = view;
-    if (!Publish(s.folder, s.file, serialize(state.lines, state.view), had))
+    if (!Publish(s.folder, s.file, serialize(state.lines, state.view, preferences), had))
         throw std::runtime_error("cannot publish document settings");
 }
 
@@ -165,6 +211,14 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
     BOOL _retryBookmarks, _retryView;
     NSURL *_pendingURL;                 // 文件仍鎖定（尚未解密）時：解密後才載入
     NSString *_pendingMember;
+    FilePreferences _preferences;       // 個別檔案設定（-1＝自動）
+    unsigned _pendingPreferences;       // 還沒寫入 .2xs 的設定欄位
+    std::optional<FileState> _pendingCloud;   // 雲端逐檔設定：解密後套用
+}
+
+- (instancetype)init {
+    if ((self = [super init])) _preferences = automaticPreferences;
+    return self;
 }
 
 - (void)reset {
@@ -173,7 +227,12 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
     _retryBookmarks = _retryView = NO;
     _pendingURL = nil;
     _pendingMember = nil;
+    _preferences = automaticPreferences;
+    _pendingPreferences = 0;
+    _pendingCloud.reset();
 }
+
+- (void)applyStoredPreferences { if (self.applyPreferences) self.applyPreferences(); }
 
 - (void)restore:(ScintillaView *)v state:(FileState &)state {
     if (state.view) ApplyView(v, *state.view);
@@ -204,6 +263,8 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
         FileState state;
         if (!ReadSidecar(s, state) && !Publish(s.folder, s.file, serialize({}), false))
             ReadSidecar(s, state);      // 其他視窗可能剛好先建立了
+        _preferences = state.preferences;
+        [self applyStoredPreferences];
         if (!locked) [self restore:v state:state];
     } catch (...) {
         // 書籤只是附加資訊，失敗不影響開檔
@@ -211,6 +272,14 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
 }
 
 - (void)loadAfterUnlock:(ScintillaView *)v {
+    if (_pendingCloud) {
+        FileState state = std::move(*_pendingCloud);
+        _pendingCloud.reset();
+        _preferences = state.preferences;
+        [self applyStoredPreferences];
+        [self restore:v state:state];
+        return;
+    }
     if (!_pendingURL) return;
     NSURL *url = _pendingURL;
     NSString *member = _pendingMember;
@@ -221,7 +290,10 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
         bool exists = false;
         OpenFolder(s, false, &exists);
         FileState state;
-        if (exists && ReadSidecar(s, state)) [self restore:v state:state];
+        if (exists && ReadSidecar(s, state)) {
+            [self applyStoredPreferences];
+            [self restore:v state:state];
+        }
     } catch (...) {
     }
 }
@@ -234,9 +306,12 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
         const bool writeView = mode != N2BookmarkSaveChanged || _retryView || view != _view;
         auto lines = includeBookmarks ? CurrentLines(v) : std::vector<LineBookmark>{};
         const bool writeBookmarks = includeBookmarks && (mode == N2BookmarkSaveNewTarget || _retryBookmarks || lines != _lines);
-        if (!writeView && !writeBookmarks) return NO;
+        // 另存新檔：個別設定一併帶到新檔案；其他情況只寫入還沒存成功的欄位
+        const unsigned fields = mode == N2BookmarkSaveNewTarget ? (1u << XS_PREF_COUNT) - 1u : _pendingPreferences;
+        if (!writeView && !writeBookmarks && !fields) return NO;
         WriteSidecar(SidecarFor(url, member), writeBookmarks ? &lines : nullptr,
-                     writeView ? std::optional<ViewState>{view} : std::nullopt);
+                     writeView ? std::optional<ViewState>{view} : std::nullopt, _preferences, fields);
+        _pendingPreferences = 0;
         if (writeBookmarks) { _lines = std::move(lines); _retryBookmarks = NO; }
         if (writeView) { _view = view; _retryView = NO; }
     } catch (...) {
@@ -245,6 +320,73 @@ NSURL *N2BookmarkSidecarURL(NSURL *url, NSString *member) {
         _retryView = YES;
     }
     return YES;
+}
+
+#pragma mark - 個別檔案設定
+
+- (int)preference:(N2FilePreference)preference {
+    return preference >= 0 && preference < (NSInteger)_preferences.size() ? _preferences[(size_t)preference] : -1;
+}
+
+- (BOOL)setPreference:(N2FilePreference)preference value:(int)value url:(NSURL *)url member:(NSString *)member {
+    if (preference < 0 || preference >= (NSInteger)_preferences.size()) return NO;
+    if (value != -1 && !validPreference((size_t)preference, value)) return NO;
+    _preferences[(size_t)preference] = value;
+    _pendingPreferences |= 1u << preference;
+    if (!url) return YES;
+    try {
+        WriteSidecar(SidecarFor(url, member), nullptr, std::nullopt, _preferences, _pendingPreferences);
+        _pendingPreferences = 0;
+        return YES;
+    } catch (...) {
+        return NO;   // 這次開啟期間仍套用，存檔或關閉時再試
+    }
+}
+
++ (int)encodingPreferenceForURL:(NSURL *)url member:(NSString *)member {
+    try {
+        Sidecar s = SidecarFor(url, member);
+        bool exists = false;
+        OpenFolder(s, false, &exists);
+        FileState state;
+        if (exists && ReadSidecar(s, state)) return state.preferences[XS_PREF_ENCODING];
+    } catch (...) {
+        // 讀不到附加資訊時照一般方式判斷編碼
+    }
+    return -1;
+}
+
+#pragma mark - 雲端逐檔設定
+
+- (BOOL)hasPendingCloudState { return _pendingCloud.has_value(); }
+
+- (BOOL)stageCloudState:(NSData *)data {
+    FileState state;
+    std::string_view bytes((const char *)data.bytes, data.length);
+    if (!bytes.empty() && !parse(bytes, state.lines, &state.view, &state.preferences)) return NO;
+    [self reset];
+    _preferences = state.preferences;
+    _pendingCloud = std::move(state);
+    return YES;
+}
+
+- (NSData *)cloudSnapshot:(ScintillaView *)v includeBookmarks:(BOOL)includeBookmarks {
+    try {
+        std::string s = serialize(includeBookmarks ? CurrentLines(v) : _lines, CaptureView(v), _preferences);
+        return [NSData dataWithBytes:s.data() length:s.size()];
+    } catch (...) {
+        return nil;
+    }
+}
+
+- (void)commitCloudSnapshot:(NSData *)data {
+    FileState state;
+    std::string_view bytes((const char *)data.bytes, data.length);
+    if (parse(bytes, state.lines, &state.view, &state.preferences)) {
+        _lines = std::move(state.lines);
+        _view = state.view;
+        _pendingPreferences = 0;
+    }
 }
 
 @end
